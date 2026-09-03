@@ -1,0 +1,95 @@
+system:
+  environment: "development"
+  storage_root: "./storage"
+  temp_root: "./storage/tmp"
+  artifacts_root: "./storage/artifacts"
+  uploads_root: "./storage/uploads"
+  database_url: "sqlite:///./storage/uav_reconstruction.db"
+
+hardware:
+  preferred_device: "auto"  # "auto" | "cuda" | "cpu"
+  cuda_device_id: 0
+  num_threads: 4
+  max_vram_gb: 8.0
+  allow_cpu_fallback: true
+  enable_opencv_cuda: false
+
+stages:
+  preprocessing:
+    max_dimension: 1920
+    target_fps: 2.0
+    apply_clahe: true
+    clahe_clip_limit: 2.0
+    clahe_tile_grid_size: [8, 8]
+    color_space: "BGR"
+
+  frame_quality:
+    blur_metric: "laplacian_variance"
+    min_sharpness_score: 85.0
+    under_exposure_threshold: 30.0
+    over_exposure_threshold: 225.0
+    min_contrast_ratio: 0.15
+
+  keyframe_selection:
+    selection_mode: "adaptive_overlap"  # "adaptive_overlap" | "fixed_interval"
+    min_translation_pixels: 40.0
+    max_feature_overlap: 0.85
+    min_feature_overlap: 0.25
+    window_size: 5
+    max_consecutive_drops: 8
+
+  pose_estimation:
+    feature_detector: "SIFT"  # "SIFT" | "ORB"
+    n_features: 4000
+    matcher_type: "FLANN"     # "FLANN" | "BF"
+    ratio_test_threshold: 0.75
+    ransac_prob: 0.999
+    ransac_threshold_px: 2.5
+    min_inlier_count: 50
+
+  geometry:
+    min_triangulation_angle_deg: 2.5
+    max_reprojection_error_px: 3.0
+    min_track_length: 2
+    outlier_std_dev_filter: 2.5
+
+  dense_point_cloud:
+    stereo_algorithm: "SGBM"  # "SGBM" | "PATCH_MATCH"
+    min_disparity: 0
+    num_disparities: 64
+    block_size: 7
+    uniqueness_ratio: 10
+    speckle_window_size: 100
+    speckle_range: 32
+    voxel_downsample_size: 0.05
+    export_format: "PLY"      # Standard binary/ASCII PLY
+
+  mesh_generation:
+    method: "DELAUNAY_SURFACE" # "DELAUNAY_SURFACE" | "BALL_PIVOTING" | "HEIGHTFIELD"
+    max_edge_length_meters: 5.0
+    smoothing_iterations: 2
+    export_format: "OBJ"
+
+  texture_mapping:
+    atlas_resolution: 2048
+    blending_mode: "WEIGHTED_AVERAGE"
+    max_views_per_face: 3
+    generate_mtl: true
+
+  georeferencing:
+    target_crs: "EPSG:3857" # Web Mercator or local UTM
+    use_telemetry_gps: true
+    interpolation_method: "linear"
+    min_gps_satellites: 6
+
+  confidence_estimation:
+    weight_reprojection: 0.4
+    weight_intersection_angle: 0.35
+    weight_observation_count: 0.25
+    confidence_scale: [0.0, 1.0]
+
+  validation:
+    max_allowable_mean_reprojection_error_px: 2.5
+    min_reconstructed_points: 100
+    min_mesh_face_count: 50
+    target_gsd_tolerance_percent: 25.0
