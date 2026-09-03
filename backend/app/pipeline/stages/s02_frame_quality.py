@@ -30,17 +30,15 @@ class FrameQualityStage(BaseStage):
         
         # We need to find metadata.json
         # The runner provides input_artifacts. We should look for metadata_json
-        manifest_path_str = input_data.input_artifacts.get("metadata_json")
+        manifest_path_str = input_data.input_artifacts.get("metadata_json") or input_data.input_artifacts.get("manifest_json")
         if not manifest_path_str or not Path(manifest_path_str).exists():
-            # Check current or previous checkpoint
             prev_dir = input_data.previous_checkpoint_dir or input_data.checkpoint_dir
-            # Wait, Phase 1 doesn't output to a pipeline checkpoint, it outputs to storage/frames/{mission_id}
-            # We can find the mission_id from the job in the database, but pipeline stages are decoupled.
-            # However, the runner passes artifacts. We'll require 'metadata_json' to be passed in.
-            
-            # Let's see if we can deduce it from the previous stage's artifact or if it was passed manually.
-            # For robustness, we will assume it's provided in input_artifacts.
-            pass
+            if prev_dir:
+                for cand_name in ["manifest.json", "metadata.json"]:
+                    cand = Path(prev_dir) / cand_name
+                    if cand.exists():
+                        manifest_path_str = str(cand)
+                        break
 
         if not manifest_path_str or not Path(manifest_path_str).exists():
             raise StageExecutionError(
@@ -69,8 +67,12 @@ class FrameQualityStage(BaseStage):
         prev_gray_small = None
 
         for idx, item in enumerate(frames):
-            fpath_relative = item["file"]
-            fpath = frames_dir / fpath_relative
+            fpath_val = item.get("file") or item.get("filepath") or item.get("filename")
+            if not fpath_val:
+                continue
+            fpath = Path(fpath_val)
+            if not fpath.is_absolute():
+                fpath = frames_dir / fpath_val
             
             if not fpath.exists():
                 logger.warning(f"Frame file missing: {fpath}")

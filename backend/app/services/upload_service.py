@@ -1,5 +1,6 @@
 """
-Upload service handling UAV video and telemetry ingestion with metadata inspection.
+Upload service handling UAV video and telemetry ingestion with metadata inspection,
+magic-byte validation, path sanitization, and maximum file-size enforcement.
 """
 from pathlib import Path
 import shutil
@@ -13,11 +14,35 @@ from backend.app.models.mission import Mission
 
 ALLOWED_VIDEO_EXTS = {".mp4", ".mov", ".avi", ".mkv"}
 ALLOWED_TELEMETRY_EXTS = {".srt", ".csv", ".gpx", ".txt", ".json"}
+MAX_UPLOAD_SIZE_BYTES = 2048 * 1024 * 1024  # 2 GB Maximum Upload Size
+CHUNK_SIZE = 1024 * 1024  # 1 MB chunk streaming
 
 
 class UploadService:
     @staticmethod
+    def validate_video_magic_bytes(header_bytes: bytes, ext: str) -> bool:
+        """
+        Validates binary magic bytes to ensure file matches declared video format
+        and is not a renamed malicious payload.
+        """
+        if len(header_bytes) < 8:
+            return False
+
+        if ext in (".mp4", ".mov"):
+            # ISO Base Media File Format: bytes 4-8 usually contain 'ftyp'
+            return b"ftyp" in header_bytes[:16] or b"moov" in header_bytes[:32] or b"wide" in header_bytes[:16]
+        elif ext == ".avi":
+            # RIFF container with AVI chunk
+            return header_bytes.startswith(b"RIFF") and b"AVI " in header_bytes[:16]
+        elif ext == ".mkv":
+            # Matroska EBML ID: 0x1A 0x45 0xDF 0xA3
+            return header_bytes.startswith(b"\x1a\x45\xdf\xa3")
+
+        return True
+
+    @staticmethod
     def inspect_video(file_path: Path) -> Dict[str, Any]:
+        """Inspects video stream properties via OpenCV."""
         cap = cv2.VideoCapture(str(file_path))
         if not cap.isOpened():
             return {"valid": False, "error": "Unable to decode video format."}
@@ -44,7 +69,10 @@ class UploadService:
         if not mission:
             raise HTTPException(status_code=404, detail=f"Mission {mission_id} not found.")
 
-        ext = Path(file.filename).suffix.lower()
+        # 1. Path sanitization (prevent directory traversal)
+        safe_filename = Path(file.filename or "uav_flight_video.mp4").name
+        ext = Path(safe_filename).suffix.lower()
+
         if ext not in ALLOWED_VIDEO_EXTS:
             raise HTTPException(
                 status_code=400,
@@ -53,17 +81,50 @@ class UploadService:
 
         mission_upload_dir = PROJECT_ROOT / "storage" / "uploads" / mission_id
         mission_upload_dir.mkdir(parents=True, exist_ok=True)
-
         target_file = mission_upload_dir / f"uav_flight_video{ext}"
+
+        # 2. Stream chunks with size enforcement and magic-byte validation
+        total_uploaded = 0
+        first_chunk = True
+
         with open(target_file, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+            while True:
+                chunk = await file.read(CHUNK_SIZE)
+                if not chunk:
+                    break
 
-        size_bytes = target_file.stat().st_size
+                if first_chunk:
+                    # Validate magic bytes on initial bytes
+                    if not UploadService.validate_video_magic_bytes(chunk, ext):
+                        target_file.unlink(missing_ok=True)
+                        raise HTTPException(
+                            status_code=400,
+                            detail="Security Check Failed: File binary signature does not match declared video container."
+                        )
+                    first_chunk = False
+
+                total_uploaded += len(chunk)
+                if total_uploaded > MAX_UPLOAD_SIZE_BYTES:
+                    target_file.unlink(missing_ok=True)
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"Payload Too Large: Video exceeds maximum allowed size of {MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)} MB."
+                    )
+
+                buffer.write(chunk)
+
+        # 3. OpenCV video stream validation
         video_meta = UploadService.inspect_video(target_file)
+        if not video_meta.get("valid", False):
+            target_file.unlink(missing_ok=True)
+            raise HTTPException(
+                status_code=400,
+                detail=f"Corrupt or unreadable video file: {video_meta.get('error', 'Decode error')}"
+            )
 
-        mission.video_filename = file.filename
+        mission.video_filename = safe_filename
         mission.video_path = str(target_file)
-        mission.video_size_bytes = float(size_bytes)
+        mission.video_size_bytes = float(total_uploaded)
         mission.video_duration_seconds = video_meta.get("duration_seconds", 0.0)
         mission.status = "ready"
 
@@ -77,7 +138,8 @@ class UploadService:
         if not mission:
             raise HTTPException(status_code=404, detail=f"Mission {mission_id} not found.")
 
-        ext = Path(file.filename).suffix.lower()
+        safe_filename = Path(file.filename or "telemetry.csv").name
+        ext = Path(safe_filename).suffix.lower()
         if ext not in ALLOWED_TELEMETRY_EXTS:
             raise HTTPException(
                 status_code=400,
@@ -86,8 +148,8 @@ class UploadService:
 
         mission_upload_dir = PROJECT_ROOT / "storage" / "uploads" / mission_id
         mission_upload_dir.mkdir(parents=True, exist_ok=True)
-
         target_file = mission_upload_dir / f"telemetry{ext}"
+
         with open(target_file, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 

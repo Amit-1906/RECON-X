@@ -32,6 +32,54 @@ class Job(Base):
     stages = relationship("JobStage", back_populates="job", cascade="all, delete-orphan", order_by="JobStage.stage_order")
     artifacts = relationship("ArtifactRegistry", back_populates="job", cascade="all, delete-orphan")
 
+    @property
+    def rapid_model_ready(self) -> bool:
+        """True if Level 1 Rapid Model is available (Stage 6 geometry completed)."""
+        for s in self.stages:
+            if s.stage_name == "geometry" and s.status == "completed":
+                return True
+        return False
+
+    @property
+    def refined_model_ready(self) -> bool:
+        """True if Level 2 Refined Model is fully completed."""
+        return self.status == "completed"
+
+    @property
+    def real_time_metrics(self) -> dict:
+        """Extracts real verified stage counts for honest progress reporting."""
+        import json
+        summary = {
+            "frames_extracted": None,
+            "keyframes_selected": None,
+            "dynamic_objects_masked": None,
+            "cameras_registered": None,
+            "dense_points": None,
+            "triangles": None,
+            "confidence_high_pct": None,
+        }
+        for s in self.stages:
+            if s.status == "completed" and s.metrics_json:
+                try:
+                    m = json.loads(s.metrics_json)
+                    if s.stage_name == "preprocessing":
+                        summary["frames_extracted"] = m.get("extracted_frames_count") or m.get("frames_extracted")
+                    elif s.stage_name == "keyframe_selection":
+                        summary["keyframes_selected"] = m.get("selected_keyframes_count") or m.get("keyframes_selected")
+                    elif s.stage_name == "dynamic_masking":
+                        summary["dynamic_objects_masked"] = m.get("total_dynamic_objects_detected") or m.get("dynamic_masks_count")
+                    elif s.stage_name == "geometry":
+                        summary["cameras_registered"] = m.get("successful_image_registrations") or m.get("number_of_cameras")
+                    elif s.stage_name == "dense_point_cloud":
+                        summary["dense_points"] = m.get("dense_points_count") or m.get("number_of_points")
+                    elif s.stage_name == "mesh_generation":
+                        summary["triangles"] = m.get("triangles") or m.get("faces")
+                    elif s.stage_name == "confidence_estimation":
+                        summary["confidence_high_pct"] = m.get("high_confidence_percentage")
+                except Exception:
+                    pass
+        return summary
+
 
 class JobStage(Base):
     __tablename__ = "job_stages"

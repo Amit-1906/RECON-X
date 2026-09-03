@@ -182,8 +182,126 @@ class TestDynamicMaskingStage:
         assert data["total_detections"] == 0
         assert "note" in data, "Uncertainty disclaimer must be present in output"
 
-        # Masks must be written for each frame
+        # Masks and static scene images must be written for each frame
         masks_dir = Path(output.artifacts["masks_dir"])
+        static_scene_dir = Path(output.artifacts["static_scene_dir"])
         for i in range(2):
             assert (masks_dir / f"frame_{i:04d}_dynamic.png").exists()
             assert (masks_dir / f"frame_{i:04d}_static.png").exists()
+            assert (static_scene_dir / f"frame_{i:04d}_static_scene.png").exists()
+
+    def test_full_stage_with_detections_and_unmodified_originals(self, tmp_path):
+        """
+        Verify that detected objects produce individual mask files, static scene reconstruction
+        images, correct dynamic_objects.json structure (frame ID, object class, confidence,
+        bounding box, mask path), and do NOT modify original keyframes.
+        """
+        from backend.app.pipeline.stages.s04_dynamic_masking import resolve_target_classes
+
+        # Verify class expansion
+        animal_classes = resolve_target_classes(["animal"])
+        assert "dog" in animal_classes
+        assert "cat" in animal_classes
+        assert "bird" in animal_classes
+
+        vehicle_classes = resolve_target_classes(["car", "motorcycle", "bicycle"])
+        assert "car" in vehicle_classes
+        assert "motorcycle" in vehicle_classes
+        assert "bicycle" in vehicle_classes
+
+        frames_dir = tmp_path / "keyframes"
+        frames_dir.mkdir()
+        kf_json = _make_keyframes_json(frames_dir, n=2)
+
+        # Store original keyframe hashes/bytes
+        orig_bytes = {}
+        for fp in frames_dir.glob("*.jpg"):
+            orig_bytes[fp.name] = fp.read_bytes()
+
+        input_data = StageInput(
+            mission_id="test_mission_dyn",
+            job_id="test_job_dyn",
+            stage_name="dynamic_masking",
+            checkpoint_dir=str(tmp_path / "checkpoint"),
+            previous_checkpoint_dir=str(tmp_path),
+            input_artifacts={"keyframes_manifest": str(kf_json)},
+            parameters={
+                "confidence_threshold": 0.35,
+                "iou_threshold": 0.5,
+                "dynamic_classes": ["person", "car", "motorcycle", "bicycle", "animal"]
+            }
+        )
+
+        # Mock YOLO model with 1 detection on frame 0
+        mock_model = MagicMock()
+        mock_model.names = {0: "person", 1: "car"}
+
+        # Detection for frame 0 (person at 100, 100, 200, 200)
+        box_det = MagicMock()
+        box_det.cls = MagicMock()
+        box_det.cls.__getitem__ = lambda self, i: MagicMock(item=lambda: 0)
+        box_det.conf = MagicMock()
+        box_det.conf.__getitem__ = lambda self, i: MagicMock(item=lambda: 0.88)
+        box_det.xyxy = MagicMock()
+        box_det.xyxy.__getitem__ = lambda self, i: [100.0, 120.0, 250.0, 300.0]
+
+        mock_boxes = MagicMock()
+        mock_boxes.__len__ = lambda self: 1
+        mock_boxes.__iter__ = lambda self: iter([box_det])
+
+        mock_res_det = MagicMock()
+        mock_res_det.boxes = mock_boxes
+        mock_res_det.masks = None
+
+        # Clean frame for frame 1
+        mock_res_clean = MagicMock()
+        mock_res_clean.boxes = MagicMock()
+        mock_res_clean.boxes.__len__ = lambda self: 0
+        mock_res_clean.boxes.__iter__ = lambda self: iter([])
+        mock_res_clean.masks = None
+
+        # Model returns detection on 1st call, clean on 2nd
+        mock_model.side_effect = [[mock_res_det], [mock_res_clean]]
+
+        with patch("backend.app.pipeline.stages.s04_dynamic_masking._get_yolo_model", return_value=mock_model):
+            stage = DynamicMaskingStage()
+            output = stage.execute(input_data)
+
+        assert output.status == "completed"
+
+        # 1. Verify original images were NOT permanently modified
+        for fp in frames_dir.glob("*.jpg"):
+            assert fp.read_bytes() == orig_bytes[fp.name], f"Original image {fp.name} was modified!"
+
+        # 2. Verify dynamic_objects.json contents
+        json_path = Path(output.artifacts["dynamic_objects_json"])
+        with open(json_path) as f:
+            data = json.load(f)
+
+        assert data["total_detections"] == 1
+        assert data["frames_with_dynamic_objects"] == 1
+        assert "dynamic_objects" in data
+        assert len(data["dynamic_objects"]) == 1
+
+        obj = data["dynamic_objects"][0]
+        # Must contain: frame ID, object class, confidence, bounding box, mask path
+        assert obj["frame_id"] == "frame_0000"
+        assert obj["object_class"] == "person"
+        assert obj["confidence"] == pytest.approx(0.88, abs=1e-3)
+        assert len(obj["bounding_box"]) == 4
+        assert "mask_path" in obj
+        assert Path(obj["mask_path"]).exists()
+
+        # 3. Verify static scene reconstruction image exists and is masked
+        static_scene_path = Path(output.artifacts["static_scene_dir"]) / "frame_0000_static_scene.png"
+        assert static_scene_path.exists()
+        static_img = cv2.imread(str(static_scene_path))
+        # Masked region should be black [0, 0, 0]
+        masked_crop = static_img[150:200, 150:200]
+        assert np.all(masked_crop == 0), "Dynamic region should be masked out in static reconstruction input"
+
+        # 4. Verify analytics layer
+        assert "analytics_layer" in data
+        assert data["analytics_layer"]["class_distribution"]["person"] == 1
+        assert "photogrammetry_corruption_risk" in data["analytics_layer"]
+

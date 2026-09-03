@@ -20,20 +20,22 @@ def test_system_endpoints(client):
 
 
 def test_stages_api(client):
-    # List all 11 stages
+    # List all 13 stages
     res = client.get("/api/v1/stages")
     assert res.status_code == 200
     stages = res.json()
-    assert len(stages) == 11
+    assert len(stages) == 13
     assert "preprocessing" in stages
+    assert "dynamic_masking" in stages
+    assert "illumination_preprocessing" in stages
     assert "validation" in stages
 
     # Stage info
-    res = client.get("/api/v1/stages/pose_estimation/info")
+    res = client.get("/api/v1/stages/illumination_preprocessing/info")
     assert res.status_code == 200
     info = res.json()
-    assert info["stage_name"] == "pose_estimation"
-    assert info["stage_order"] == 4
+    assert info["stage_name"] == "illumination_preprocessing"
+    assert info["stage_order"] == 5
 
 
 def test_mission_and_upload_flow(client, sample_uav_video):
@@ -78,4 +80,4 @@ def test_mission_and_upload_flow(client, sample_uav_video):
     assert res.status_code == 202
     job = res.json()
     assert job["mission_id"] == mission_id
-    assert len(job["stages"]) == 11
+    assert len(job["stages"]) == 13

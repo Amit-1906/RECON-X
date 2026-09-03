@@ -10,6 +10,8 @@ from backend.app.pipeline.stages import (
     PreprocessingStage,
     FrameQualityStage,
     KeyframeSelectionStage,
+    DynamicMaskingStage,
+    IlluminationPreprocessingStage,
     PoseEstimationStage,
     GeometryStage,
     DensePointCloudStage,
@@ -87,9 +89,49 @@ def test_all_eleven_stages_contracts(sample_uav_video, tmp_path):
     artifacts_tracker.update(s3_out.artifacts)
     prev_dir = str(s3_dir)
 
-    # --- Stage 4: Pose Estimation ---
+    # --- Stage 4: Dynamic Masking ---
+    s4_dyn = DynamicMaskingStage()
+    s4_dyn_dir = tmp_path / "s04_dynamic_masking"
+    s4_dyn_input = StageInput(
+        job_id=job_id,
+        mission_id=mission_id,
+        stage_name=s4_dyn.stage_name,
+        checkpoint_dir=str(s4_dyn_dir),
+        previous_checkpoint_dir=prev_dir,
+        input_artifacts=artifacts_tracker,
+        parameters={"confidence_threshold": 0.35}
+    )
+    s4_dyn_out = s4_dyn.run(s4_dyn_input)
+    assert s4_dyn_out.status == "completed"
+    assert "dynamic_objects_json" in s4_dyn_out.artifacts
+    assert "static_scene_dir" in s4_dyn_out.artifacts
+    assert Path(s4_dyn_out.artifacts["dynamic_objects_json"]).exists()
+    artifacts_tracker.update(s4_dyn_out.artifacts)
+    prev_dir = str(s4_dyn_dir)
+
+    # --- Stage 5: Illumination-Aware Preprocessing ---
+    s5_illum = IlluminationPreprocessingStage()
+    s5_illum_dir = tmp_path / "s05_illumination_preprocessing"
+    s5_illum_input = StageInput(
+        job_id=job_id,
+        mission_id=mission_id,
+        stage_name=s5_illum.stage_name,
+        checkpoint_dir=str(s5_illum_dir),
+        previous_checkpoint_dir=prev_dir,
+        input_artifacts=artifacts_tracker,
+        parameters={"mode": "normalized"}
+    )
+    s5_illum_out = s5_illum.run(s5_illum_input)
+    assert s5_illum_out.status == "completed"
+    assert "illumination_json" in s5_illum_out.artifacts
+    assert "normalized_dir" in s5_illum_out.artifacts
+    assert Path(s5_illum_out.artifacts["illumination_json"]).exists()
+    artifacts_tracker.update(s5_illum_out.artifacts)
+    prev_dir = str(s5_illum_dir)
+
+    # --- Stage 6: Pose Estimation ---
     s4 = PoseEstimationStage()
-    s4_dir = tmp_path / "s04_pose_estimation"
+    s4_dir = tmp_path / "s06_pose_estimation"
     s4_input = StageInput(
         job_id=job_id,
         mission_id=mission_id,
@@ -100,11 +142,13 @@ def test_all_eleven_stages_contracts(sample_uav_video, tmp_path):
         focal_length_mm=24.0,
         sensor_width_mm=35.9,
         flight_altitude_m=40.0,
-        parameters={"feature_detector": "SIFT", "n_features": 1000}
+        parameters={"feature_detector": "SIFT", "n_features": 1000, "use_normalized": True}
     )
     s4_out = s4.run(s4_input)
     assert s4_out.status == "completed"
+    assert "trajectory_json" in s4_out.artifacts
     assert "camera_poses" in s4_out.artifacts
+    assert Path(s4_out.artifacts["trajectory_json"]).exists()
     assert Path(s4_out.artifacts["camera_poses"]).exists()
     artifacts_tracker.update(s4_out.artifacts)
     prev_dir = str(s4_dir)
@@ -123,8 +167,15 @@ def test_all_eleven_stages_contracts(sample_uav_video, tmp_path):
     )
     s5_out = s5.run(s5_input)
     assert s5_out.status == "completed"
+    assert "sparse_point_cloud_ply" in s5_out.artifacts
     assert "sparse_ply" in s5_out.artifacts
-    assert Path(s5_out.artifacts["sparse_ply"]).exists()
+    assert "camera_poses" in s5_out.artifacts
+    assert "feature_matches" in s5_out.artifacts
+    assert "reconstruction_metrics" in s5_out.artifacts
+    assert Path(s5_out.artifacts["sparse_point_cloud_ply"]).exists()
+    assert Path(s5_out.artifacts["camera_poses"]).exists()
+    assert Path(s5_out.artifacts["feature_matches"]).exists()
+    assert Path(s5_out.artifacts["reconstruction_metrics"]).exists()
     artifacts_tracker.update(s5_out.artifacts)
     prev_dir = str(s5_dir)
 
@@ -143,8 +194,16 @@ def test_all_eleven_stages_contracts(sample_uav_video, tmp_path):
     )
     s6_out = s6.run(s6_input)
     assert s6_out.status == "completed"
+    assert "dense_point_cloud_ply" in s6_out.artifacts
     assert "dense_ply" in s6_out.artifacts
+    assert "depth_maps_dir" in s6_out.artifacts
+    assert "dense_confidence_dir" in s6_out.artifacts
+    assert "dense_metrics" in s6_out.artifacts
+    assert Path(s6_out.artifacts["dense_point_cloud_ply"]).exists()
     assert Path(s6_out.artifacts["dense_ply"]).exists()
+    assert Path(s6_out.artifacts["depth_maps_dir"]).exists()
+    assert Path(s6_out.artifacts["dense_confidence_dir"]).exists()
+    assert Path(s6_out.artifacts["dense_metrics"]).exists()
     artifacts_tracker.update(s6_out.artifacts)
     prev_dir = str(s6_dir)
 

@@ -33,7 +33,8 @@ class PipelineRunner:
         preferred_device: str = "auto",
         on_stage_start: Optional[Callable[[str, int], None]] = None,
         on_stage_complete: Optional[Callable[[str, int, StageOutput], None]] = None,
-        on_stage_failed: Optional[Callable[[str, int, str], None]] = None
+        on_stage_failed: Optional[Callable[[str, int, str], None]] = None,
+        cancellation_check: Optional[Callable[[], bool]] = None
     ):
         self.job_id = job_id
         self.mission_id = mission_id
@@ -48,6 +49,7 @@ class PipelineRunner:
         self.on_stage_start = on_stage_start
         self.on_stage_complete = on_stage_complete
         self.on_stage_failed = on_stage_failed
+        self.cancellation_check = cancellation_check
 
         self.job_logger = get_job_logger(job_id)
 
@@ -93,6 +95,10 @@ class PipelineRunner:
         stage_outputs: Dict[str, StageOutput] = {}
 
         for idx in range(start_idx, total_stages):
+            if self.cancellation_check and self.cancellation_check():
+                self.job_logger.warning("Pipeline execution cancelled by user request.")
+                raise StageExecutionError("Job execution was cancelled by user.")
+
             stage_name = ORDERED_STAGES[idx]
             stage_order = idx + 1
             stage_instance = get_stage_instance(stage_name)

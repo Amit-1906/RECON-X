@@ -16,6 +16,8 @@ const STAGE_DESCRIPTIONS = {
   preprocessing: "Extracts video frames at target sampling rate, normalizes color space, applies CLAHE contrast.",
   frame_quality: "Calculates Laplacian variance sharpness, luminance distribution, and motion blur.",
   keyframe_selection: "Prunes redundant stationary frames using optical flow and visual baseline displacement.",
+  dynamic_masking: "YOLOv8-seg dynamic object detection and masking to prevent moving objects from corrupting 3D reconstruction.",
+  illumination_preprocessing: "Illumination-aware preprocessing: reduces exposure drift, extreme shadows, and contrast variations.",
   pose_estimation: "SIFT/ORB feature detection, RANSAC epipolar geometry, and 6-DoF camera trajectory recovery.",
   geometry: "Multi-view triangulation of feature correspondences into metric 3D point coordinates with reprojection filter.",
   dense_point_cloud: "Semi-Global Block Matching (SGBM) stereo disparity fields projected into dense 3D point cloud.",
@@ -39,7 +41,7 @@ export default function StagePipelineView({ stages = [], currentStage, onResumeS
           <div>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#fff' }}>Reconstruction Pipeline</h3>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              11 Independent Modular Photogrammetric Stages with Atomic Checkpoints
+              13 Independent Modular Photogrammetric Stages with Atomic Checkpoints
             </p>
           </div>
           <div className="badge badge-cyan">

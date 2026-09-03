@@ -23,9 +23,32 @@ from backend.app.schemas.stage import StageOutput
 
 logger = logging.getLogger("uav_reconstruction.job_service")
 executor = ThreadPoolExecutor(max_workers=2)
+_cancelled_jobs = set()
 
 
 class JobService:
+    @staticmethod
+    def cancel_job(db: Session, job_id: str) -> Job:
+        """Cancels a pending or running reconstruction job."""
+        job = db.query(Job).filter(Job.id == job_id).first()
+        if not job:
+            raise HTTPException(status_code=404, detail=f"Job {job_id} not found.")
+
+        if job.status in ("completed", "cancelled"):
+            return job
+
+        _cancelled_jobs.add(job_id)
+        job.status = "cancelled"
+        job.error_message = "Job execution was cancelled by user request."
+        mission = db.query(Mission).filter(Mission.id == job.mission_id).first()
+        if mission:
+            mission.status = "failed"
+
+        db.commit()
+        db.refresh(job)
+        logger.info(f"Job {job_id} marked as cancelled by user request.")
+        return job
+
     @staticmethod
     def create_and_dispatch_job(db: Session, job_in: JobCreate) -> Job:
         mission = db.query(Mission).filter(Mission.id == job_in.mission_id).first()
@@ -210,25 +233,36 @@ class JobService:
                 preferred_device=job.preferred_device,
                 on_stage_start=on_start,
                 on_stage_complete=on_complete,
-                on_stage_failed=on_failed
+                on_stage_failed=on_failed,
+                cancellation_check=lambda: job_id in _cancelled_jobs
             )
 
             result = runner.run(start_from_stage=start_from_stage)
 
-            # Finalize completed job
-            job.status = "completed"
-            job.progress_percent = 100.0
-            job.completed_at = datetime.utcnow()
-            mission.status = "completed"
+            if job_id in _cancelled_jobs:
+                job.status = "cancelled"
+                job.error_message = "Job execution cancelled by user request."
+                mission.status = "failed"
+            else:
+                # Finalize completed job
+                job.status = "completed"
+                job.progress_percent = 100.0
+                job.completed_at = datetime.utcnow()
+                mission.status = "completed"
             db.commit()
 
         except Exception as e:
-            logger.exception(f"Job execution failed for job {job_id}: {e}")
-            job.status = "failed"
-            job.error_message = str(e)
+            if job_id in _cancelled_jobs:
+                job.status = "cancelled"
+                job.error_message = "Job execution cancelled by user request."
+            else:
+                logger.exception(f"Job execution failed for job {job_id}: {e}")
+                job.status = "failed"
+                job.error_message = str(e)
             mission.status = "failed"
             db.commit()
         finally:
+            _cancelled_jobs.discard(job_id)
             db.close()
 
     @staticmethod

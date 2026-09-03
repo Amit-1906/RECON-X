@@ -65,22 +65,32 @@ stages:
     export_format: "PLY"      # Standard binary/ASCII PLY
 
   mesh_generation:
-    method: "DELAUNAY_SURFACE" # "DELAUNAY_SURFACE" | "BALL_PIVOTING" | "HEIGHTFIELD"
+    method: "DELAUNAY_ALPHA"  # "DELAUNAY_ALPHA" | "POISSON_SURFACE" | "BALL_PIVOTING" | "HEIGHTFIELD"
     max_edge_length_meters: 5.0
-    smoothing_iterations: 2
-    export_format: "OBJ"
+    min_point_confidence: 0.25
+    mesh_density: "medium"    # "high" | "medium" | "low" | float decimation ratio (e.g. 0.5)
+    min_component_faces: 15   # Pruning threshold for floating isolated artifact components
+    smoothing_iterations: 2   # Boundary-preserving Laplacian smoothing passes
+    export_formats: ["PLY", "GLB", "OBJ"]
 
   texture_mapping:
     atlas_resolution: 2048
-    blending_mode: "WEIGHTED_AVERAGE"
+    blending_mode: "WEIGHTED_AVERAGE" # "WEIGHTED_AVERAGE" | "BEST_VIEW"
     max_views_per_face: 3
+    min_view_angle_deg: 12.0          # Minimum viewing angle to surface normal (grazing rejection)
+    min_sharpness_score: 35.0         # Reject heavily blurred frames
+    seam_reduction: true              # Multi-camera boundary luminance harmonization
     generate_mtl: true
+    unobserved_color: [100, 116, 139] # Slate diagnostic color for unobserved surfaces
 
   georeferencing:
     target_crs: "EPSG:3857" # Web Mercator or local UTM
+    default_datum: "WGS 84" # EPSG:4326
     use_telemetry_gps: true
-    interpolation_method: "linear"
+    scale_constraint_priority: ["RTK_PPK", "STANDALONE_GNSS", "ALTIMETRY", "CHECKPOINTS"]
     min_gps_satellites: 6
+    outlier_mad_threshold: 2.5
+    export_georeferenced_glb: true
 
   confidence_estimation:
     weight_reprojection: 0.4

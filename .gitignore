@@ -18,10 +18,11 @@ env/
 *.db-shm
 *.db-wal
 
-# Storage (large media files)
-backend/storage/uploads/
-backend/storage/frames/
-backend/storage/jobs/
+# Storage (large media files & generated artifacts)
+backend/storage/
+storage/
+*.pt
+*.onnx
 
 # Node / Frontend
 node_modules/

@@ -11,6 +11,12 @@ export const apiClient = {
     return res.json();
   },
 
+  async getSystemStatus() {
+    const res = await fetch(`${API_BASE}/system/status`);
+    if (!res.ok) throw new Error('Failed to fetch system status');
+    return res.json();
+  },
+
   async getHealth() {
     const res = await fetch(`${API_BASE}/system/health`);
     return res.json();
@@ -178,6 +184,16 @@ export const apiClient = {
     return res.json();
   },
 
+  async cancelJob(jobId) {
+    const res = await fetch(`${API_BASE}/jobs/${jobId}/cancel`, { method: 'POST' });
+    if (!res.ok) throw new Error('Failed to cancel job');
+    return res.json();
+  },
+
+  getExportBundleUrl(jobId) {
+    return `${API_BASE}/results/${jobId}/export-bundle`;
+  },
+
   async getMissionJobs(missionId) {
     const res = await fetch(`${API_BASE}/jobs/mission/${missionId}`);
     if (!res.ok) throw new Error('Failed to fetch jobs');
@@ -209,10 +225,50 @@ export const apiClient = {
     return res.json();
   },
 
+  async getDynamicAnalyticsReport(jobId) {
+    const res = await fetch(`${API_BASE}/results/${jobId}/dynamic-analytics`);
+    if (!res.ok) throw new Error('Failed to fetch dynamic analytics report');
+    return res.json();
+  },
+
+  async getIlluminationReport(jobId) {
+    const res = await fetch(`${API_BASE}/results/${jobId}/illumination`);
+    if (!res.ok) throw new Error('Failed to fetch illumination report');
+    return res.json();
+  },
+
+  async getTrajectoryReport(jobId) {
+    const res = await fetch(`${API_BASE}/results/${jobId}/trajectory`);
+    if (!res.ok) throw new Error('Failed to fetch trajectory report');
+    return res.json();
+  },
+
+  async getReconstructionReport(jobId) {
+    const res = await fetch(`${API_BASE}/results/${jobId}/reconstruction`);
+    if (!res.ok) throw new Error('Failed to fetch reconstruction report');
+    return res.json();
+  },
+
+  async getDenseReport(jobId) {
+    const res = await fetch(`${API_BASE}/results/${jobId}/dense`);
+    if (!res.ok) throw new Error('Failed to fetch dense report');
+    return res.json();
+  },
+
+  async getBenchmarkReport(jobId) {
+    const res = await fetch(`${API_BASE}/results/${jobId}/benchmark`);
+    if (!res.ok) throw new Error('Failed to fetch benchmark report');
+    return res.json();
+  },
+
   async getArtifacts(jobId) {
     const res = await fetch(`${API_BASE}/results/${jobId}/artifacts`);
     if (!res.ok) throw new Error('Failed to fetch artifacts');
     return res.json();
+  },
+
+  async getJobArtifacts(jobId) {
+    return this.getArtifacts(jobId);
   },
 
   getArtifactDownloadUrl(jobId, artifactType) {

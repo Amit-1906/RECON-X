@@ -146,6 +146,26 @@ class KeyframeSelectionStage(BaseStage):
             else:
                 consecutive_drops += 1
 
+        if len(selected_keyframes) < 2 and len(records) >= 2:
+            # Select the final frame as fallback to guarantee stereoscopic baseline
+            rec = records[-1]
+            img_path = rec["filepath"]
+            kf_idx = len(selected_keyframes)
+            dest_filename = f"keyframe_{kf_idx:04d}.jpg"
+            dest_path = keyframes_dir / dest_filename
+            shutil.copy2(img_path, str(dest_path))
+            selected_keyframes.append({
+                "keyframe_id": kf_idx,
+                "original_frame_id": rec["frame_id"],
+                "filename": dest_filename,
+                "filepath": str(dest_path),
+                "timestamp_sec": rec.get("timestamp_sec", 0.0),
+                "quality_score": rec.get("overall_quality", 0),
+                "feature_score": rec.get("feature_score", 0.0),
+                "similarity_to_previous": 0.0,
+                "selection_reason": "MINIMUM_KEYFRAME_FALLBACK"
+            })
+
         if len(selected_keyframes) < 2:
             raise StageExecutionError(
                 self.stage_name,

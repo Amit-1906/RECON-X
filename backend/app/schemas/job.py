@@ -38,5 +38,9 @@ class JobResponse(BaseModel):
     completed_at: Optional[datetime] = None
     updated_at: datetime
     stages: List[JobStageResponse] = Field(default_factory=list)
+    rapid_model_ready: bool = False
+    refined_model_ready: bool = False
+    real_time_metrics: Optional[Dict[str, Any]] = None
+    system_status: Optional[Dict[str, Any]] = None
 
     model_config = ConfigDict(from_attributes=True)

@@ -129,7 +129,8 @@ class PreprocessingStage(BaseStage):
             checkpoint_dir=input_data.checkpoint_dir,
             artifacts={
                 "frames_dir": str(frames_dir),
-                "manifest_json": str(manifest_path)
+                "manifest_json": str(manifest_path),
+                "metadata_json": str(manifest_path)
             },
             metrics={
                 "extracted_frames_count": saved_count,
