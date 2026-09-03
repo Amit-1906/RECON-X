@@ -203,6 +203,12 @@ export const apiClient = {
     return res.json();
   },
 
+  async getDynamicObjectsReport(jobId) {
+    const res = await fetch(`${API_BASE}/results/${jobId}/dynamic-objects`);
+    if (!res.ok) throw new Error('Failed to fetch dynamic objects report');
+    return res.json();
+  },
+
   async getArtifacts(jobId) {
     const res = await fetch(`${API_BASE}/results/${jobId}/artifacts`);
     if (!res.ok) throw new Error('Failed to fetch artifacts');

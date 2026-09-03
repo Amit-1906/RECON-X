@@ -80,3 +80,23 @@ def get_keyframes_report(job_id: str, db: Session = Depends(get_db)):
         data = json.load(f)
         
     return data
+
+
+@router.get("/{job_id}/dynamic-objects")
+def get_dynamic_objects_report(job_id: str, db: Session = Depends(get_db)):
+    """Fetch the Phase 4 dynamic object detection & masking report."""
+    from backend.app.models.job import Job
+    import json
+
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found.")
+    
+    json_path = Path(job.checkpoint_dir) / "dynamic_objects.json"
+    if not json_path.exists():
+        raise HTTPException(status_code=404, detail="Dynamic objects report not found yet.")
+        
+    with open(json_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+        
+    return data

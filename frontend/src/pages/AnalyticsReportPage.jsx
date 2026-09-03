@@ -11,7 +11,10 @@ import {
   Activity,
   Zap,
   Filter,
-  Scissors
+  Scissors,
+  Shield,
+  Target,
+  Box
 } from 'lucide-react';
 import { apiClient } from '../api/client';
 
@@ -19,6 +22,7 @@ export default function AnalyticsReportPage({ activeJobId }) {
   const [activeTab, setActiveTab] = useState('quality');
   const [qualityReport, setQualityReport] = useState(null);
   const [keyframesReport, setKeyframesReport] = useState(null);
+  const [dynamicReport, setDynamicReport] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
@@ -32,14 +36,18 @@ export default function AnalyticsReportPage({ activeJobId }) {
     setLoading(true);
     
     Promise.all([
-      apiClient.getFrameQualityReport(activeJobId).catch(err => null),
-      apiClient.getKeyframesReport(activeJobId).catch(err => null)
-    ]).then(([qReport, kReport]) => {
+      apiClient.getFrameQualityReport(activeJobId).catch(() => null),
+      apiClient.getKeyframesReport(activeJobId).catch(() => null),
+      apiClient.getDynamicObjectsReport(activeJobId).catch(() => null)
+    ]).then(([qReport, kReport, dReport]) => {
       if (isMounted) {
         setQualityReport(qReport);
         setKeyframesReport(kReport);
-        setError(!qReport && !kReport ? "Reports not available for this job yet." : null);
+        setDynamicReport(dReport);
+        const anyReport = qReport || kReport || dReport;
+        setError(!anyReport ? "Reports not available for this job yet." : null);
         if (!qReport && kReport) setActiveTab('keyframes');
+        if (!qReport && !kReport && dReport) setActiveTab('dynamic');
       }
     }).finally(() => {
       if (isMounted) setLoading(false);
@@ -100,7 +108,7 @@ export default function AnalyticsReportPage({ activeJobId }) {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '32px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' }}>
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '32px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px', flexWrap: 'wrap' }}>
         <button
           onClick={() => setActiveTab('quality')}
           disabled={!qualityReport}
@@ -127,10 +135,24 @@ export default function AnalyticsReportPage({ activeJobId }) {
         >
           <Scissors size={16} /> Phase 3: Keyframes
         </button>
+        <button
+          onClick={() => setActiveTab('dynamic')}
+          disabled={!dynamicReport}
+          style={{
+            background: activeTab === 'dynamic' ? 'rgba(251,191,36,0.15)' : 'transparent',
+            color: activeTab === 'dynamic' ? '#fbbf24' : (dynamicReport ? '#e2e8f0' : 'var(--text-muted)'),
+            border: `1px solid ${activeTab === 'dynamic' ? '#fbbf2455' : 'transparent'}`,
+            padding: '8px 16px', borderRadius: '8px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px',
+            cursor: dynamicReport ? 'pointer' : 'not-allowed', transition: 'all 0.2s'
+          }}
+        >
+          <Shield size={16} /> Phase 4: Dynamic Masking
+        </button>
       </div>
 
       {activeTab === 'quality' && qualityReport && <QualityTab report={qualityReport} filterClass={filterClass} setFilterClass={setFilterClass} />}
       {activeTab === 'keyframes' && keyframesReport && <KeyframesTab report={keyframesReport} qualityReport={qualityReport} />}
+      {activeTab === 'dynamic' && dynamicReport && <DynamicMaskingTab report={dynamicReport} />}
       
     </div>
   );
@@ -377,3 +399,155 @@ function MetricRow({ icon: Icon, label, value }) {
     </div>
   );
 }
+
+// ── Phase 4: Dynamic Masking Tab ──────────────────────────────────────────
+
+const VIEW_MODES = ['original', 'detections', 'dynamic_mask', 'static_mask'];
+const VIEW_LABELS = {
+  original: 'Original',
+  detections: 'Detections',
+  dynamic_mask: 'Dynamic Mask',
+  static_mask: 'Static Scene'
+};
+
+function DynamicMaskingTab({ report }) {
+  const [viewMode, setViewMode] = useState('detections');
+  const [selectedFrame, setSelectedFrame] = useState(null);
+
+  const confidenceColor = (conf) => {
+    if (conf >= 0.75) return '#34d399';
+    if (conf >= 0.5) return '#fbbf24';
+    return '#f87171';
+  };
+
+  const getImgUrl = (frame) => {
+    if (viewMode === 'detections') return `/api/v1/system/static?path=${encodeURIComponent(frame.detection_viz_path)}`;
+    if (viewMode === 'dynamic_mask') return `/api/v1/system/static?path=${encodeURIComponent(frame.dynamic_mask_path)}`;
+    if (viewMode === 'static_mask') return `/api/v1/system/static?path=${encodeURIComponent(frame.static_mask_path)}`;
+    return `/api/v1/system/static?path=${encodeURIComponent(frame.keyframe_path)}`;
+  };
+
+  return (
+    <>
+      {/* Stats row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+        <StatCard label="Frames Processed" value={report.total_keyframes} icon={ImageIcon} color="#fbbf24" />
+        <StatCard label="Frames w/ Objects" value={report.frames_with_dynamic_objects} icon={Shield} color="#f87171" />
+        <StatCard label="Total Detections" value={report.total_detections} icon={Target} color="#a78bfa" />
+        <StatCard label="Model Used" value={report.model_used.replace('.pt', '')} icon={Box} color="#38bdf8" />
+      </div>
+
+      {/* Disclaimer */}
+      <div style={{
+        background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)',
+        borderRadius: '10px', padding: '12px 16px', marginBottom: '24px',
+        fontSize: '0.8rem', color: '#fbbf24', display: 'flex', alignItems: 'flex-start', gap: '10px'
+      }}>
+        <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 2 }} />
+        <span>{report.note}</span>
+      </div>
+
+      {/* Target classes list */}
+      <div style={{ marginBottom: '24px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', alignSelf: 'center' }}>Monitored classes:</span>
+        {report.target_classes.map(cls => (
+          <span key={cls} style={{
+            background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.2)',
+            color: '#fbbf24', padding: '2px 10px', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 600
+          }}>{cls}</span>
+        ))}
+      </div>
+
+      {/* View Mode Toggle */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', background: 'rgba(0,0,0,0.2)', padding: '6px', borderRadius: '10px', width: 'fit-content' }}>
+        {VIEW_MODES.map(mode => (
+          <button key={mode} onClick={() => setViewMode(mode)} style={{
+            background: viewMode === mode ? 'rgba(251,191,36,0.2)' : 'transparent',
+            color: viewMode === mode ? '#fbbf24' : 'var(--text-muted)',
+            border: `1px solid ${viewMode === mode ? '#fbbf2444' : 'transparent'}`,
+            padding: '6px 14px', borderRadius: '7px', fontSize: '0.78rem', fontWeight: 600,
+            cursor: 'pointer', transition: 'all 0.2s'
+          }}>
+            {VIEW_LABELS[mode]}
+          </button>
+        ))}
+      </div>
+
+      {/* Frame Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px', overflowY: 'auto', maxHeight: '680px' }}>
+        {report.frames.map(frame => (
+          <div
+            key={frame.frame_id}
+            onClick={() => setSelectedFrame(selectedFrame?.frame_id === frame.frame_id ? null : frame)}
+            style={{
+              background: 'rgba(0,0,0,0.25)',
+              border: `1px solid ${selectedFrame?.frame_id === frame.frame_id ? '#fbbf24' : (frame.detection_count > 0 ? 'rgba(248,113,113,0.3)' : 'rgba(255,255,255,0.08)')}`,
+              borderRadius: '12px', overflow: 'hidden', cursor: 'pointer',
+              transition: 'border-color 0.2s, box-shadow 0.2s',
+              boxShadow: selectedFrame?.frame_id === frame.frame_id ? '0 0 0 2px #fbbf2444' : 'none'
+            }}
+          >
+            {/* Thumbnail */}
+            <div style={{ height: '160px', background: '#0d0d0d', position: 'relative', overflow: 'hidden' }}>
+              <img
+                src={getImgUrl(frame)}
+                alt={frame.frame_id}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                onError={e => { e.target.style.opacity = 0.1; }}
+              />
+              {frame.detection_count > 0 && (
+                <div style={{
+                  position: 'absolute', top: '8px', right: '8px',
+                  background: 'rgba(248,113,113,0.85)', color: '#fff',
+                  padding: '3px 10px', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 700,
+                  backdropFilter: 'blur(4px)'
+                }}>
+                  {frame.detection_count} object{frame.detection_count !== 1 ? 's' : ''}
+                </div>
+              )}
+              <div style={{
+                position: 'absolute', bottom: '8px', left: '8px',
+                background: 'rgba(0,0,0,0.65)', color: '#e2e8f0',
+                padding: '2px 8px', borderRadius: '5px', fontSize: '0.7rem', fontFamily: 'monospace'
+              }}>
+                {frame.timestamp_sec.toFixed(2)}s
+              </div>
+            </div>
+
+            {/* Info */}
+            <div style={{ padding: '12px' }}>
+              <div style={{ fontSize: '0.75rem', color: '#e2e8f0', fontWeight: 600, marginBottom: '8px' }}>{frame.frame_id}</div>
+              <MetricRow icon={Shield} label="Dynamic area" value={`${frame.dynamic_pixel_percent}%`} />
+
+              {/* Detections list */}
+              {frame.detections.length > 0 && (
+                <div style={{ marginTop: '10px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px' }}>
+                  {frame.detections.map((det, di) => (
+                    <div key={di} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '0.7rem', color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <Target size={10} color="#a78bfa" /> {det.class}
+                        {det.has_segmentation_mask
+                          ? <span style={{ color: '#34d399', fontSize: '0.62rem' }}>seg</span>
+                          : <span style={{ color: '#94a3b8', fontSize: '0.62rem' }}>bbox</span>}
+                      </span>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: confidenceColor(det.confidence) }}>
+                        {Math.round(det.confidence * 100)}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {frame.detections.length === 0 && (
+                <div style={{ marginTop: '8px', fontSize: '0.7rem', color: '#34d399', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <CheckCircle2 size={11} /> No dynamic objects detected
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
