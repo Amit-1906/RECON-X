@@ -20,8 +20,20 @@ export default function Navbar({ activePage, setActivePage, activeMissionId, act
     { id: 'analytics', label: 'Quality Analytics', icon: BarChart3 },
   ];
 
+  const isLight = activePage === 'landing';
+
   return (
-    <header className="glass-header sticky top-0 z-50 px-6 py-3 flex items-center justify-between">
+    <header 
+      className="sticky top-0 z-50 px-6 py-3"
+      style={{
+        background: isLight ? 'rgba(255, 255, 255, 0.88)' : 'rgba(10, 16, 29, 0.90)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        borderBottom: isLight ? '1px solid rgba(14, 165, 233, 0.2)' : '1px solid var(--border-subtle)',
+        boxShadow: isLight ? '0 4px 20px rgba(15, 23, 42, 0.04)' : 'none',
+        transition: 'all 0.25s ease'
+      }}
+    >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         {/* Brand */}
         <div 
@@ -32,20 +44,20 @@ export default function Navbar({ activePage, setActivePage, activeMissionId, act
             width: '38px',
             height: '38px',
             borderRadius: '10px',
-            background: 'linear-gradient(135deg, #06b6d4, #0284c7)',
+            background: 'linear-gradient(135deg, #0284c7, #0d9488)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 0 15px rgba(6, 182, 212, 0.4)'
+            boxShadow: isLight ? '0 4px 12px rgba(2, 132, 199, 0.3)' : '0 0 15px rgba(6, 182, 212, 0.4)'
           }}>
             <Plane size={22} color="#ffffff" />
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontWeight: 800, fontSize: '1.1rem', letterSpacing: '-0.02em', color: '#fff' }}>AEROSCAN</span>
-              <span style={{ fontWeight: 800, fontSize: '1.1rem', color: '#38bdf8' }}>3D</span>
+              <span style={{ fontWeight: 800, fontSize: '1.1rem', letterSpacing: '-0.02em', color: isLight ? '#0f172a' : '#fff' }}>AEROSCAN</span>
+              <span style={{ fontWeight: 800, fontSize: '1.1rem', color: isLight ? '#0284c7' : '#38bdf8' }}>3D</span>
             </div>
-            <p style={{ fontSize: '0.65rem', color: 'var(--text-dim)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+            <p style={{ fontSize: '0.65rem', color: isLight ? '#64748b' : 'var(--text-dim)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
               UAV Photogrammetry Engine
             </p>
           </div>
@@ -66,9 +78,15 @@ export default function Navbar({ activePage, setActivePage, activeMissionId, act
                   gap: '8px',
                   padding: '8px 14px',
                   borderRadius: '8px',
-                  background: isActive ? 'rgba(6, 182, 212, 0.15)' : 'transparent',
-                  color: isActive ? '#38bdf8' : 'var(--text-muted)',
-                  border: isActive ? '1px solid rgba(6, 182, 212, 0.3)' : '1px solid transparent',
+                  background: isActive 
+                    ? (isLight ? 'rgba(2, 132, 199, 0.12)' : 'rgba(6, 182, 212, 0.15)')
+                    : 'transparent',
+                  color: isActive 
+                    ? (isLight ? '#0284c7' : '#38bdf8')
+                    : (isLight ? '#475569' : 'var(--text-muted)'),
+                  border: isActive 
+                    ? (isLight ? '1px solid rgba(2, 132, 199, 0.28)' : '1px solid rgba(6, 182, 212, 0.3)')
+                    : '1px solid transparent',
                   fontWeight: isActive ? 600 : 500,
                   fontSize: '0.85rem',
                   cursor: 'pointer',
@@ -90,19 +108,22 @@ export default function Navbar({ activePage, setActivePage, activeMissionId, act
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                padding: '6px 12px',
+                padding: '6px 14px',
                 borderRadius: '20px',
-                background: 'rgba(15, 23, 42, 0.8)',
-                border: '1px solid var(--border-subtle)',
-                fontSize: '0.75rem'
+                background: isLight ? 'rgba(240, 249, 255, 0.9)' : 'rgba(15, 23, 42, 0.8)',
+                border: isLight ? '1px solid rgba(14, 165, 233, 0.25)' : '1px solid var(--border-subtle)',
+                fontSize: '0.75rem',
+                boxShadow: isLight ? '0 2px 8px rgba(15, 23, 42, 0.04)' : 'none'
               }}
               title={JSON.stringify(hardware.device_capabilities, null, 2)}
             >
-              <Cpu size={14} color={hardware.device_capabilities?.cuda_available ? '#10b981' : '#38bdf8'} />
-              <span style={{ color: 'var(--text-muted)' }}>Device:</span>
+              <Cpu size={14} color={hardware.device_capabilities?.cuda_available ? '#059669' : '#0284c7'} />
+              <span style={{ color: isLight ? '#64748b' : 'var(--text-muted)' }}>Device:</span>
               <span style={{ 
                 fontWeight: 600, 
-                color: hardware.device_capabilities?.cuda_available ? '#34d399' : '#38bdf8' 
+                color: hardware.device_capabilities?.cuda_available 
+                  ? (isLight ? '#059669' : '#34d399')
+                  : (isLight ? '#0284c7' : '#38bdf8')
               }}>
                 {hardware.device_capabilities?.cuda_available 
                   ? `GPU (${hardware.device_capabilities.device_name})` 
@@ -110,7 +131,7 @@ export default function Navbar({ activePage, setActivePage, activeMissionId, act
               </span>
             </div>
           ) : (
-            <div className="badge badge-cyan">
+            <div className={isLight ? "telemetry-chip" : "badge badge-cyan"}>
               <ShieldCheck size={12} /> System Ready
             </div>
           )}

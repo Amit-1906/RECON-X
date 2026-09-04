@@ -86,10 +86,12 @@ export default function App() {
       <footer style={{
         padding: '20px',
         textAlign: 'center',
-        borderTop: '1px solid var(--border-subtle)',
+        borderTop: activePage === 'landing' ? '1px solid rgba(14, 165, 233, 0.2)' : '1px solid var(--border-subtle)',
         fontSize: '0.75rem',
-        color: 'var(--text-dim)',
-        background: 'rgba(6, 9, 15, 0.95)'
+        color: activePage === 'landing' ? '#64748b' : 'var(--text-dim)',
+        background: activePage === 'landing' ? 'rgba(255, 255, 255, 0.88)' : 'rgba(6, 9, 15, 0.95)',
+        backdropFilter: 'blur(12px)',
+        transition: 'all 0.25s ease'
       }}>
         UAV Single-Pass 3D Reconstruction Platform • Photogrammetric Engine v1.0 • OpenCV & PyTorch Accelerated
       </footer>
