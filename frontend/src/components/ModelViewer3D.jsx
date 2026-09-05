@@ -31,11 +31,13 @@ const textureCache = {
   initialized: false,
   terrain: null,
   terrainNormal: null,
+  heritageFacade: null,
+  heritageNormal: null,
+  roof: null,
   concrete: null,
   concreteNormal: null,
-  corrugated: null,
-  corrugatedNormal: null,
-  roof: null,
+  modernFacade: null,
+  solar: null,
   asphalt: null,
   hazard: null,
   gcp: null
@@ -44,23 +46,41 @@ const textureCache = {
 function getPhotogrammetryTextures() {
   if (textureCache.initialized) return textureCache;
 
-  // 1. Terrain Orthomosaic Multi-Splat Texture (1024x1024)
+  // 1. High-Resolution Orthomosaic Aerial Ground Texture (2048x2048)
+  // Maps 140m x 140m surveyed area: center (1024, 1024) = (0, 0) world meters. 1m ≈ 14.63px
   const tCanvas = document.createElement('canvas');
-  tCanvas.width = 1024;
-  tCanvas.height = 1024;
+  tCanvas.width = 2048;
+  tCanvas.height = 2048;
   const tCtx = tCanvas.getContext('2d');
 
-  // Base grass / soil ground with organic variations
-  tCtx.fillStyle = '#4d6938';
-  tCtx.fillRect(0, 0, 1024, 1024);
+  // Photogrammetric survey boundary void (black border)
+  tCtx.fillStyle = '#06080d';
+  tCtx.fillRect(0, 0, 2048, 2048);
 
-  // Fractal-like organic soil & turf color patches
-  for (let i = 0; i < 600; i++) {
-    const px = Math.random() * 1024;
-    const py = Math.random() * 1024;
-    const rad = 20 + Math.random() * 80;
+  // Surveyed site polygon boundary mask
+  tCtx.save();
+  tCtx.beginPath();
+  tCtx.moveTo(90, 180);
+  tCtx.lineTo(950, 80);
+  tCtx.lineTo(1960, 110);
+  tCtx.lineTo(2010, 1200);
+  tCtx.lineTo(1920, 1960);
+  tCtx.lineTo(750, 2000);
+  tCtx.lineTo(70, 1750);
+  tCtx.closePath();
+  tCtx.clip();
+
+  // Base grass / soil ground with organic variations
+  tCtx.fillStyle = '#445f31';
+  tCtx.fillRect(0, 0, 2048, 2048);
+
+  // Organic soil, turf & shadow tonal patches
+  const hues = ['#364f26', '#4e6935', '#5a733e', '#667843', '#3d3429', '#4c4234', '#3c5228'];
+  for (let i = 0; i < 900; i++) {
+    const px = 100 + Math.random() * 1850;
+    const py = 100 + Math.random() * 1850;
+    const rad = 25 + Math.random() * 110;
     const grad = tCtx.createRadialGradient(px, py, 0, px, py, rad);
-    const hues = ['#3b5629', '#576f3a', '#6a7843', '#493f32', '#5a4d3c', '#40582d'];
     const col = hues[Math.floor(Math.random() * hues.length)];
     grad.addColorStop(0, col);
     grad.addColorStop(1, 'transparent');
@@ -70,121 +90,222 @@ function getPhotogrammetryTextures() {
     tCtx.fill();
   }
 
-  // Fine soil & grass texture noise stippling
-  const tImg = tCtx.getImageData(0, 0, 1024, 1024);
+  // Fine noise stippling for photographic turf
+  const tImg = tCtx.getImageData(0, 0, 2048, 2048);
   const tData = tImg.data;
   for (let i = 0; i < tData.length; i += 4) {
-    const n = (Math.random() - 0.5) * 28;
+    if (tData[i + 3] === 0) continue;
+    const n = (Math.random() - 0.5) * 26;
     tData[i] = Math.min(255, Math.max(0, tData[i] + n));
     tData[i + 1] = Math.min(255, Math.max(0, tData[i + 1] + n));
-    tData[i + 2] = Math.min(255, Math.max(0, tData[i + 2] + n * 0.8));
+    tData[i + 2] = Math.min(255, Math.max(0, tData[i + 2] + n * 0.75));
   }
   tCtx.putImageData(tImg, 0, 0);
 
-  // Central Graded Concrete / Gravel Apron under Hangar & Annex
-  // In UV space: center (512, 512). Map size 130x130m. 1m ≈ 7.87px.
-  // Hangar at (-8, 6), Annex at (18, 4)
-  const apronX = 512 + (-2) * 7.87;
-  const apronY = 512 - (5) * 7.87;
+  // Helper coordinate mapper: world meters (wx, wy) -> canvas pixels
+  const toPx = (wx, wy) => ({
+    x: 1024 + wx * 14.63,
+    y: 1024 - wy * 14.63
+  });
+
+  // 1A. Upper-Right Landscaped Terrace Plaza & Geometric Gardens
+  const terrP1 = toPx(26, 38);
+  const terrP2 = toPx(66, 38);
+  const terrP3 = toPx(66, -4);
+  const terrP4 = toPx(26, -4);
   tCtx.save();
-  tCtx.fillStyle = '#9ca3af';
+  tCtx.fillStyle = '#cbd2d9';
   tCtx.beginPath();
-  tCtx.roundRect(apronX - 250, apronY - 180, 520, 360, 24);
+  tCtx.moveTo(terrP1.x, terrP1.y);
+  tCtx.lineTo(terrP2.x, terrP2.y);
+  tCtx.lineTo(terrP3.x, terrP3.y);
+  tCtx.lineTo(terrP4.x, terrP4.y);
+  tCtx.closePath();
   tCtx.fill();
 
-  // Apron concrete slab expansion joint grid
+  // Paved tile joints
+  tCtx.strokeStyle = 'rgba(100, 116, 139, 0.45)';
+  tCtx.lineWidth = 1.5;
+  for (let gx = terrP1.x; gx <= terrP2.x; gx += 42) {
+    tCtx.beginPath(); tCtx.moveTo(gx, terrP1.y); tCtx.lineTo(gx, terrP3.y); tCtx.stroke();
+  }
+  for (let gy = terrP1.y; gy <= terrP3.y; gy += 42) {
+    tCtx.beginPath(); tCtx.moveTo(terrP1.x, gy); tCtx.lineTo(terrP2.x, gy); tCtx.stroke();
+  }
+
+  // Formal Geometric Clover / X Hedge Maze Pattern on Terrace (from reference!)
+  const hedgeCenter1 = toPx(42, 22);
+  const hedgeCenter2 = toPx(52, 22);
+  [hedgeCenter1, hedgeCenter2].forEach(hc => {
+    tCtx.fillStyle = '#1e381b';
+    tCtx.strokeStyle = '#38632d';
+    tCtx.lineWidth = 5;
+    // Diamond / cross hedges
+    tCtx.beginPath();
+    tCtx.moveTo(hc.x, hc.y - 48);
+    tCtx.lineTo(hc.x + 48, hc.y);
+    tCtx.lineTo(hc.x, hc.y + 48);
+    tCtx.lineTo(hc.x - 48, hc.y);
+    tCtx.closePath();
+    tCtx.stroke();
+    // Inner cross
+    tCtx.beginPath();
+    tCtx.arc(hc.x, hc.y, 22, 0, Math.PI * 2);
+    tCtx.stroke();
+  });
+  tCtx.restore();
+
+  // 1B. Central Entrance Forecourt & Arrival Driveway (Terracotta Pavers)
+  const courtP = toPx(-2, -6);
+  tCtx.save();
+  tCtx.fillStyle = '#9c5443';
+  tCtx.beginPath();
+  tCtx.arc(courtP.x, courtP.y, 110, 0, Math.PI * 2);
+  tCtx.fill();
+  tCtx.strokeStyle = '#7c3f31';
+  tCtx.lineWidth = 3;
+  tCtx.stroke();
+  tCtx.restore();
+
+  // 1C. Top-Left Parking Lot
+  const parkP = toPx(-24, 32);
+  tCtx.save();
+  tCtx.fillStyle = '#26292f';
+  tCtx.beginPath();
+  tCtx.roundRect(parkP.x - 170, parkP.y - 120, 340, 240, 16);
+  tCtx.fill();
   tCtx.strokeStyle = '#64748b';
-  tCtx.lineWidth = 2;
-  for (let gx = apronX - 240; gx <= apronX + 260; gx += 52) {
-    tCtx.beginPath();
-    tCtx.moveTo(gx, apronY - 170);
-    tCtx.lineTo(gx, apronY + 170);
-    tCtx.stroke();
-  }
-  for (let gy = apronY - 170; gy <= apronY + 170; gy += 52) {
-    tCtx.beginPath();
-    tCtx.moveTo(apronX - 240, gy);
-    tCtx.lineTo(apronX + 260, gy);
-    tCtx.stroke();
-  }
+  tCtx.lineWidth = 4;
+  tCtx.stroke();
 
-  // Weathering, fuel & oil drips, tire wear on apron
-  for (let i = 0; i < 40; i++) {
-    const ox = apronX - 200 + Math.random() * 400;
-    const oy = apronY - 140 + Math.random() * 280;
-    const oRad = 4 + Math.random() * 22;
-    const oGrad = tCtx.createRadialGradient(ox, oy, 0, ox, oy, oRad);
-    oGrad.addColorStop(0, 'rgba(40, 45, 52, 0.45)');
-    oGrad.addColorStop(1, 'transparent');
-    tCtx.fillStyle = oGrad;
-    tCtx.beginPath();
-    tCtx.arc(ox, oy, oRad, 0, Math.PI * 2);
-    tCtx.fill();
+  // Parking stalls
+  tCtx.strokeStyle = '#f1f5f9';
+  tCtx.lineWidth = 2.5;
+  for (let row = -1; row <= 1; row += 2) {
+    const ry = parkP.y + row * 65;
+    for (let bx = parkP.x - 145; bx <= parkP.x + 145; bx += 26) {
+      tCtx.beginPath();
+      tCtx.moveTo(bx, ry - 38);
+      tCtx.lineTo(bx + 16, ry + 38);
+      tCtx.stroke();
+    }
   }
   tCtx.restore();
 
-  // Access Road Ring: centered at (4, 2) in world space, radius 24 to 31m (approx 215px)
-  const roadCX = 512 + 4 * 7.87;
-  const roadCY = 512 - 2 * 7.87;
-  const roadRInner = 24 * 7.87;
-  const roadROuter = 31 * 7.87;
-  const roadRMid = (roadRInner + roadROuter) / 2;
-  const roadWidth = roadROuter - roadRInner;
+  // 1D. Curving Multi-Lane Roadway Network (Front, Left & Perimeter)
+  // Path points: Sweeps from bottom-right (48, -38) across front (0, -26) to left (-36, -14) and up (-44, 36)
+  const roadPts = [
+    toPx(54, -40),
+    toPx(36, -34),
+    toPx(16, -28),
+    toPx(-4, -25),
+    toPx(-24, -22),
+    toPx(-36, -12),
+    toPx(-42, 6),
+    toPx(-44, 26),
+    toPx(-45, 46)
+  ];
 
-  // Road Asphalt Body
+  const drawSmoothRoad = (lineWidth, strokeStyle, lineDash = []) => {
+    tCtx.save();
+    tCtx.strokeStyle = strokeStyle;
+    tCtx.lineWidth = lineWidth;
+    tCtx.lineCap = 'round';
+    tCtx.lineJoin = 'round';
+    tCtx.setLineDash(lineDash);
+    tCtx.beginPath();
+    tCtx.moveTo(roadPts[0].x, roadPts[0].y);
+    for (let i = 1; i < roadPts.length - 1; i++) {
+      const xc = (roadPts[i].x + roadPts[i + 1].x) / 2;
+      const yc = (roadPts[i].y + roadPts[i + 1].y) / 2;
+      tCtx.quadraticCurveTo(roadPts[i].x, roadPts[i].y, xc, yc);
+    }
+    tCtx.lineTo(roadPts[roadPts.length - 1].x, roadPts[roadPts.length - 1].y);
+    tCtx.stroke();
+    tCtx.restore();
+  };
+
+  // Main asphalt road bed (width ~11m => 160px)
+  drawSmoothRoad(160, '#22252a');
+
+  // Concrete curbs / road shoulders
+  drawSmoothRoad(168, 'rgba(148, 163, 184, 0.4)');
+  drawSmoothRoad(160, '#26292f');
+
+  // Red transit / bus / cycle lane along curve (seen prominently in reference!)
+  drawSmoothRoad(26, '#8b2e2e');
+
+  // Solid white outer road boundary lines
+  drawSmoothRoad(152, 'rgba(241, 245, 249, 0.9)');
+  drawSmoothRoad(144, '#26292f');
+
+  // Double solid yellow centerlines
+  drawSmoothRoad(10, '#eab308');
+  drawSmoothRoad(3, '#26292f');
+  drawSmoothRoad(1, '#eab308');
+
+  // Dashed lane divider lines
+  drawSmoothRoad(76, '#f8fafc', [22, 28]);
+
+  // Pedestrian Zebra Crossings at Intersections
+  const crossingPts = [toPx(14, -28), toPx(-24, -22), toPx(-42, 10)];
+  crossingPts.forEach(pt => {
+    tCtx.save();
+    tCtx.fillStyle = '#f8fafc';
+    for (let b = -50; b <= 50; b += 16) {
+      tCtx.fillRect(pt.x + b - 5, pt.y - 28, 10, 56);
+    }
+    tCtx.restore();
+  });
+
+  // Painted yellow chevron hazard / traffic island markings
+  const chevronPt = toPx(-8, -25);
   tCtx.save();
-  tCtx.beginPath();
-  tCtx.arc(roadCX, roadCY, roadRMid, 0, Math.PI * 2);
-  tCtx.strokeStyle = '#2b3038';
-  tCtx.lineWidth = roadWidth;
-  tCtx.stroke();
-
-  // Road Edge Shoulders (Gravel Transition)
-  tCtx.strokeStyle = '#6b7280';
-  tCtx.lineWidth = 3;
-  tCtx.beginPath();
-  tCtx.arc(roadCX, roadCY, roadRInner + 1, 0, Math.PI * 2);
-  tCtx.stroke();
-  tCtx.beginPath();
-  tCtx.arc(roadCX, roadCY, roadROuter - 1, 0, Math.PI * 2);
-  tCtx.stroke();
-
-  // White Centerline Dashes
-  tCtx.strokeStyle = '#e2e8f0';
-  tCtx.lineWidth = 3.5;
-  tCtx.setLineDash([16, 20]);
-  tCtx.beginPath();
-  tCtx.arc(roadCX, roadCY, roadRMid, 0, Math.PI * 2);
-  tCtx.stroke();
-  tCtx.setLineDash([]);
-  tCtx.restore();
-
-  // Helipad Graphic in Orthomosaic: (0, -22) -> (512, 512 + 22 * 7.87) ≈ (512, 685)
-  const heliX = 512;
-  const heliY = 512 + 22 * 7.87;
-  const heliR = 8 * 7.87;
-  tCtx.save();
-  tCtx.fillStyle = '#4b5563';
-  tCtx.beginPath();
-  tCtx.arc(heliX, heliY, heliR, 0, Math.PI * 2);
-  tCtx.fill();
-  tCtx.strokeStyle = '#374151';
-  tCtx.lineWidth = 3;
-  tCtx.stroke();
-
-  // Helipad Yellow Safety Ring
   tCtx.strokeStyle = '#eab308';
-  tCtx.lineWidth = 7;
-  tCtx.beginPath();
-  tCtx.arc(heliX, heliY, heliR - 8, 0, Math.PI * 2);
-  tCtx.stroke();
-
-  // Helipad White "H"
-  tCtx.fillStyle = '#f8fafc';
-  tCtx.fillRect(heliX - 20, heliY - 24, 8, 48);
-  tCtx.fillRect(heliX + 12, heliY - 24, 8, 48);
-  tCtx.fillRect(heliX - 20, heliY - 5, 40, 10);
+  tCtx.lineWidth = 4;
+  for (let ch = -35; ch <= 35; ch += 14) {
+    tCtx.beginPath();
+    tCtx.moveTo(chevronPt.x + ch - 12, chevronPt.y - 18);
+    tCtx.lineTo(chevronPt.x + ch, chevronPt.y);
+    tCtx.lineTo(chevronPt.x + ch - 12, chevronPt.y + 18);
+    tCtx.stroke();
+  }
   tCtx.restore();
+
+  // White directional lane arrows
+  const arrowPts = [toPx(32, -32), toPx(-32, -16), toPx(-43, 20)];
+  arrowPts.forEach(pt => {
+    tCtx.save();
+    tCtx.fillStyle = '#f8fafc';
+    tCtx.beginPath();
+    tCtx.moveTo(pt.x, pt.y - 16);
+    tCtx.lineTo(pt.x + 8, pt.y);
+    tCtx.lineTo(pt.x + 3, pt.y);
+    tCtx.lineTo(pt.x + 3, pt.y + 20);
+    tCtx.lineTo(pt.x - 3, pt.y + 20);
+    tCtx.lineTo(pt.x - 3, pt.y);
+    tCtx.lineTo(pt.x - 8, pt.y);
+    tCtx.closePath();
+    tCtx.fill();
+    tCtx.restore();
+  });
+
+  // Sidewalk concrete pedestrian paths linking buildings and terraces
+  tCtx.save();
+  tCtx.strokeStyle = '#94a3b8';
+  tCtx.lineWidth = 22;
+  tCtx.lineCap = 'round';
+  tCtx.beginPath();
+  const swP1 = toPx(-3, -12);
+  const swP2 = toPx(24, 2);
+  const swP3 = toPx(28, 20);
+  tCtx.moveTo(swP1.x, swP1.y);
+  tCtx.lineTo(swP2.x, swP2.y);
+  tCtx.lineTo(swP3.x, swP3.y);
+  tCtx.stroke();
+  tCtx.restore();
+
+  tCtx.restore(); // end survey boundary clip
 
   const terrainTex = new THREE.CanvasTexture(tCanvas);
   terrainTex.wrapS = THREE.ClampToEdgeWrapping;
@@ -197,8 +318,8 @@ function getPhotogrammetryTextures() {
   const tnCtx = tNormCanvas.getContext('2d');
   const tnImg = tnCtx.createImageData(512, 512);
   for (let i = 0; i < tnImg.data.length; i += 4) {
-    tnImg.data[i] = 128 + Math.floor((Math.random() - 0.5) * 35);
-    tnImg.data[i + 1] = 128 + Math.floor((Math.random() - 0.5) * 35);
+    tnImg.data[i] = 128 + Math.floor((Math.random() - 0.5) * 32);
+    tnImg.data[i + 1] = 128 + Math.floor((Math.random() - 0.5) * 32);
     tnImg.data[i + 2] = 255;
     tnImg.data[i + 3] = 255;
   }
@@ -206,132 +327,223 @@ function getPhotogrammetryTextures() {
   const terrainNorm = new THREE.CanvasTexture(tNormCanvas);
   terrainNorm.wrapS = THREE.RepeatWrapping;
   terrainNorm.wrapT = THREE.RepeatWrapping;
-  terrainNorm.repeat.set(12, 12);
+  terrainNorm.repeat.set(16, 16);
 
-  // 2. Corrugated Industrial Steel Panel Texture (512x512)
-  const cCanvas = document.createElement('canvas');
-  cCanvas.width = 512;
-  cCanvas.height = 512;
-  const cCtx = cCanvas.getContext('2d');
-  cCtx.fillStyle = '#64748b';
-  cCtx.fillRect(0, 0, 512, 512);
+  // 2. Heritage Institutional Facade Texture (Terracotta Brick & Stone Pilasters with Arched Windows)
+  const hfCanvas = document.createElement('canvas');
+  hfCanvas.width = 1024;
+  hfCanvas.height = 512;
+  const hfCtx = hfCanvas.getContext('2d');
 
-  const ribW = 16;
-  for (let x = 0; x < 512; x += ribW) {
-    const rGrad = cCtx.createLinearGradient(x, 0, x + ribW, 0);
-    rGrad.addColorStop(0.0, '#475569');
-    rGrad.addColorStop(0.3, '#94a3b8');
-    rGrad.addColorStop(0.7, '#64748b');
-    rGrad.addColorStop(1.0, '#334155');
-    cCtx.fillStyle = rGrad;
-    cCtx.fillRect(x, 0, ribW, 512);
+  // Base terracotta brickwork
+  hfCtx.fillStyle = '#9e4e3d';
+  hfCtx.fillRect(0, 0, 1024, 512);
+
+  // Brick coursing and texture noise
+  for (let y = 0; y < 512; y += 8) {
+    hfCtx.strokeStyle = 'rgba(60, 25, 18, 0.35)';
+    hfCtx.lineWidth = 1;
+    hfCtx.beginPath();
+    hfCtx.moveTo(0, y);
+    hfCtx.lineTo(1024, y);
+    hfCtx.stroke();
   }
-  for (let y = 64; y < 512; y += 96) {
-    cCtx.strokeStyle = 'rgba(30, 41, 59, 0.4)';
-    cCtx.lineWidth = 2;
-    cCtx.beginPath();
-    cCtx.moveTo(0, y);
-    cCtx.lineTo(512, y);
-    cCtx.stroke();
-    cCtx.fillStyle = '#cbd5e1';
-    for (let x = ribW / 2; x < 512; x += ribW * 2) {
-      cCtx.beginPath();
-      cCtx.arc(x, y, 2, 0, Math.PI * 2);
-      cCtx.fill();
+  for (let i = 0; i < 400; i++) {
+    const bx = Math.random() * 1024;
+    const by = Math.random() * 512;
+    hfCtx.fillStyle = Math.random() > 0.5 ? 'rgba(120, 45, 32, 0.4)' : 'rgba(175, 95, 75, 0.3)';
+    hfCtx.fillRect(bx, by, 16 + Math.random() * 32, 6);
+  }
+
+  // Stone stringcourses / cornices separating floors
+  [0, 128, 256, 384, 508].forEach(cy => {
+    hfCtx.fillStyle = '#ece7df';
+    hfCtx.fillRect(0, cy - 6, 1024, 12);
+    hfCtx.fillStyle = 'rgba(70, 60, 50, 0.25)';
+    hfCtx.fillRect(0, cy + 6, 1024, 3);
+  });
+
+  // Vertical stone pilasters dividing bays
+  for (let px = 0; px <= 1024; px += 128) {
+    hfCtx.fillStyle = '#e4dfd7';
+    hfCtx.fillRect(px - 10, 0, 20, 512);
+    hfCtx.fillStyle = 'rgba(50, 40, 30, 0.2)';
+    hfCtx.fillRect(px + 8, 0, 3, 512);
+  }
+
+  // Classical Arched Windows in Each Bay
+  for (let row = 0; row < 4; row++) {
+    const wy = row * 128 + 22;
+    for (let px = 0; px < 1024; px += 128) {
+      const wx = px + 28;
+      const ww = 72;
+      const wh = 86;
+
+      // Stone arch frame surround
+      hfCtx.fillStyle = '#f1ece4';
+      hfCtx.beginPath();
+      hfCtx.roundRect(wx - 4, wy - 4, ww + 8, wh + 8, [28, 28, 4, 4]);
+      hfCtx.fill();
+
+      // Recessed dark glazing with sky gradient reflection
+      const wGrad = hfCtx.createLinearGradient(wx, wy, wx, wy + wh);
+      wGrad.addColorStop(0, '#1a324b');
+      wGrad.addColorStop(0.3, '#0c1724');
+      wGrad.addColorStop(1, '#080d14');
+      hfCtx.fillStyle = wGrad;
+      hfCtx.beginPath();
+      hfCtx.roundRect(wx, wy, ww, wh, [24, 24, 2, 2]);
+      hfCtx.fill();
+
+      // Stone window mullions (cross bars)
+      hfCtx.strokeStyle = '#e2ded6';
+      hfCtx.lineWidth = 2.5;
+      hfCtx.beginPath();
+      hfCtx.moveTo(wx + ww / 2, wy);
+      hfCtx.lineTo(wx + ww / 2, wy + wh);
+      hfCtx.moveTo(wx, wy + wh * 0.45);
+      hfCtx.lineTo(wx + ww, wy + wh * 0.45);
+      hfCtx.stroke();
+
+      // Decorative keystone at top of arch
+      hfCtx.fillStyle = '#ffffff';
+      hfCtx.beginPath();
+      hfCtx.moveTo(wx + ww / 2 - 5, wy - 6);
+      hfCtx.lineTo(wx + ww / 2 + 5, wy - 6);
+      hfCtx.lineTo(wx + ww / 2 + 3, wy + 2);
+      hfCtx.lineTo(wx + ww / 2 - 3, wy + 2);
+      hfCtx.closePath();
+      hfCtx.fill();
     }
   }
-  const baseGrad = cCtx.createLinearGradient(0, 360, 0, 512);
-  baseGrad.addColorStop(0, 'transparent');
-  baseGrad.addColorStop(1, 'rgba(71, 60, 48, 0.45)');
-  cCtx.fillStyle = baseGrad;
-  cCtx.fillRect(0, 360, 512, 152);
 
-  const corrugatedTex = new THREE.CanvasTexture(cCanvas);
-  corrugatedTex.wrapS = THREE.RepeatWrapping;
-  corrugatedTex.wrapT = THREE.RepeatWrapping;
+  const heritageFacadeTex = new THREE.CanvasTexture(hfCanvas);
+  heritageFacadeTex.wrapS = THREE.RepeatWrapping;
+  heritageFacadeTex.wrapT = THREE.RepeatWrapping;
 
-  // Corrugated Normal Map
-  const cnCanvas = document.createElement('canvas');
-  cnCanvas.width = 256;
-  cnCanvas.height = 256;
-  const cnCtx = cnCanvas.getContext('2d');
-  const cnImg = cnCtx.createImageData(256, 256);
-  for (let y = 0; y < 256; y++) {
-    for (let x = 0; x < 256; x++) {
-      const idx = (y * 256 + x) * 4;
-      const angle = (x / 16) * Math.PI * 2;
-      const nx = Math.sin(angle) * 0.45;
-      cnImg.data[idx] = Math.floor((nx + 1) * 127.5);
-      cnImg.data[idx + 1] = 128;
-      cnImg.data[idx + 2] = 230;
-      cnImg.data[idx + 3] = 255;
+  // Heritage Facade Normal Map
+  const hfnCanvas = document.createElement('canvas');
+  hfnCanvas.width = 512;
+  hfnCanvas.height = 256;
+  const hfnCtx = hfnCanvas.getContext('2d');
+  const hfnImg = hfnCtx.createImageData(512, 256);
+  for (let i = 0; i < hfnImg.data.length; i += 4) {
+    hfnImg.data[i] = 128 + Math.floor((Math.random() - 0.5) * 18);
+    hfnImg.data[i + 1] = 128 + Math.floor((Math.random() - 0.5) * 18);
+    hfnImg.data[i + 2] = 245;
+    hfnImg.data[i + 3] = 255;
+  }
+  hfnCtx.putImageData(hfnImg, 0, 0);
+  const heritageNormal = new THREE.CanvasTexture(hfnCanvas);
+  heritageNormal.wrapS = THREE.RepeatWrapping;
+  heritageNormal.wrapT = THREE.RepeatWrapping;
+
+  // 3. Weathered Mossy Sage-Green Roof Texture (Matching Reference Image!)
+  const rCanvas = document.createElement('canvas');
+  rCanvas.width = 512;
+  rCanvas.height = 512;
+  const rCtx = rCanvas.getContext('2d');
+
+  // Base weathered green membrane / copper patina (Matching reference image!)
+  rCtx.fillStyle = '#557c63';
+  rCtx.fillRect(0, 0, 512, 512);
+
+  // Roofing membrane seams
+  rCtx.strokeStyle = '#385842';
+  rCtx.lineWidth = 3.5;
+  for (let x = 0; x <= 512; x += 48) {
+    rCtx.beginPath();
+    rCtx.moveTo(x, 0);
+    rCtx.lineTo(x, 512);
+    rCtx.stroke();
+  }
+
+  // Weathering, moisture, gravel wash stains
+  for (let i = 0; i < 50; i++) {
+    const rx = Math.random() * 512;
+    const ry = Math.random() * 512;
+    const rad = 20 + Math.random() * 60;
+    const grad = rCtx.createRadialGradient(rx, ry, 0, rx, ry, rad);
+    const hues = ['rgba(52, 78, 60, 0.5)', 'rgba(98, 134, 110, 0.4)', 'rgba(68, 92, 74, 0.45)', 'rgba(48, 40, 30, 0.25)'];
+    grad.addColorStop(0, hues[Math.floor(Math.random() * hues.length)]);
+    grad.addColorStop(1, 'transparent');
+    rCtx.fillStyle = grad;
+    rCtx.beginPath();
+    rCtx.arc(rx, ry, rad, 0, Math.PI * 2);
+    rCtx.fill();
+  }
+
+  // Edge gravel wash border
+  rCtx.strokeStyle = 'rgba(180, 195, 185, 0.35)';
+  rCtx.lineWidth = 8;
+  rCtx.strokeRect(4, 4, 504, 504);
+
+  const roofTex = new THREE.CanvasTexture(rCanvas);
+  roofTex.wrapS = THREE.RepeatWrapping;
+  roofTex.wrapT = THREE.RepeatWrapping;
+
+  // 4. Modern Perforated Brise-Soleil / Metal Screen Facade (Western Building)
+  const modCanvas = document.createElement('canvas');
+  modCanvas.width = 512;
+  modCanvas.height = 512;
+  const modCtx = modCanvas.getContext('2d');
+  modCtx.fillStyle = '#f1f5f9';
+  modCtx.fillRect(0, 0, 512, 512);
+
+  // Horizontal ribbon glass windows
+  for (let y = 32; y < 512; y += 120) {
+    modCtx.fillStyle = '#0f172a';
+    modCtx.fillRect(0, y, 512, 60);
+  }
+
+  // Decorative geometric perforated screen / lattice overlay
+  modCtx.fillStyle = 'rgba(226, 232, 240, 0.95)';
+  for (let x = 8; x < 512; x += 32) {
+    for (let y = 8; y < 512; y += 32) {
+      modCtx.beginPath();
+      modCtx.arc(x, y, 9, 0, Math.PI * 2);
+      modCtx.fill();
     }
   }
-  cnCtx.putImageData(cnImg, 0, 0);
-  const corrugatedNorm = new THREE.CanvasTexture(cnCanvas);
-  corrugatedNorm.wrapS = THREE.RepeatWrapping;
-  corrugatedNorm.wrapT = THREE.RepeatWrapping;
 
-  // 3. Architectural Precast Concrete Texture (512x512)
+  const modernFacadeTex = new THREE.CanvasTexture(modCanvas);
+  modernFacadeTex.wrapS = THREE.RepeatWrapping;
+  modernFacadeTex.wrapT = THREE.RepeatWrapping;
+
+  // 5. Architectural Precast Concrete Texture
   const conCanvas = document.createElement('canvas');
   conCanvas.width = 512;
   conCanvas.height = 512;
   const conCtx = conCanvas.getContext('2d');
   conCtx.fillStyle = '#cbd5e1';
   conCtx.fillRect(0, 0, 512, 512);
-
   conCtx.strokeStyle = 'rgba(100, 116, 139, 0.4)';
-  conCtx.lineWidth = 3;
-  for (let x = 0; x <= 512; x += 256) {
-    conCtx.beginPath();
-    conCtx.moveTo(x, 0);
-    conCtx.lineTo(x, 512);
-    conCtx.stroke();
+  conCtx.lineWidth = 2.5;
+  for (let x = 0; x <= 512; x += 128) {
+    conCtx.beginPath(); conCtx.moveTo(x, 0); conCtx.lineTo(x, 512); conCtx.stroke();
   }
   for (let y = 0; y <= 512; y += 128) {
-    conCtx.beginPath();
-    conCtx.moveTo(0, y);
-    conCtx.lineTo(512, y);
-    conCtx.stroke();
-    conCtx.fillStyle = 'rgba(71, 85, 105, 0.7)';
-    for (let x = 32; x < 512; x += 192) {
-      conCtx.beginPath();
-      conCtx.arc(x, y + 24, 3.5, 0, Math.PI * 2);
-      conCtx.arc(x, y + 104, 3.5, 0, Math.PI * 2);
-      conCtx.fill();
-    }
-  }
-  for (let i = 0; i < 20; i++) {
-    const sx = Math.random() * 512;
-    const sw = 8 + Math.random() * 24;
-    const sGrad = conCtx.createLinearGradient(sx, 0, sx, 512);
-    sGrad.addColorStop(0, 'rgba(148, 163, 184, 0.3)');
-    sGrad.addColorStop(1, 'rgba(100, 116, 139, 0.1)');
-    conCtx.fillStyle = sGrad;
-    conCtx.fillRect(sx, 0, sw, 512);
+    conCtx.beginPath(); conCtx.moveTo(0, y); conCtx.lineTo(512, y); conCtx.stroke();
   }
   const conImg = conCtx.getImageData(0, 0, 512, 512);
   for (let i = 0; i < conImg.data.length; i += 4) {
     const n = (Math.random() - 0.5) * 16;
-    conImg.data[i] += n;
-    conImg.data[i + 1] += n;
-    conImg.data[i + 2] += n;
+    conImg.data[i] += n; conImg.data[i + 1] += n; conImg.data[i + 2] += n;
   }
   conCtx.putImageData(conImg, 0, 0);
   const concreteTex = new THREE.CanvasTexture(conCanvas);
   concreteTex.wrapS = THREE.RepeatWrapping;
   concreteTex.wrapT = THREE.RepeatWrapping;
 
-  // Concrete Normal Map
   const conNormCanvas = document.createElement('canvas');
   conNormCanvas.width = 256;
   conNormCanvas.height = 256;
   const connCtx = conNormCanvas.getContext('2d');
   const connImg = connCtx.createImageData(256, 256);
   for (let i = 0; i < connImg.data.length; i += 4) {
-    connImg.data[i] = 128 + Math.floor((Math.random() - 0.5) * 20);
-    connImg.data[i + 1] = 128 + Math.floor((Math.random() - 0.5) * 20);
-    connImg.data[i + 2] = 240;
+    connImg.data[i] = 128 + Math.floor((Math.random() - 0.5) * 18);
+    connImg.data[i + 1] = 128 + Math.floor((Math.random() - 0.5) * 18);
+    connImg.data[i + 2] = 245;
     connImg.data[i + 3] = 255;
   }
   connCtx.putImageData(connImg, 0, 0);
@@ -339,57 +551,39 @@ function getPhotogrammetryTextures() {
   concreteNorm.wrapS = THREE.RepeatWrapping;
   concreteNorm.wrapT = THREE.RepeatWrapping;
 
-  // 4. Weathered Industrial Roof Texture (512x512)
-  const rCanvas = document.createElement('canvas');
-  rCanvas.width = 512;
-  rCanvas.height = 512;
-  const rCtx = rCanvas.getContext('2d');
-  rCtx.fillStyle = '#334155';
-  rCtx.fillRect(0, 0, 512, 512);
-  rCtx.strokeStyle = '#1e293b';
-  rCtx.lineWidth = 3;
-  for (let x = 0; x <= 512; x += 24) {
-    rCtx.beginPath();
-    rCtx.moveTo(x, 0);
-    rCtx.lineTo(x, 512);
-    rCtx.stroke();
+  // 6. Rooftop Solar Photovoltaic Cell Texture
+  const solCanvas = document.createElement('canvas');
+  solCanvas.width = 256;
+  solCanvas.height = 256;
+  const solCtx = solCanvas.getContext('2d');
+  solCtx.fillStyle = '#0f2742';
+  solCtx.fillRect(0, 0, 256, 256);
+  solCtx.strokeStyle = 'rgba(148, 163, 184, 0.4)';
+  solCtx.lineWidth = 1.5;
+  for (let x = 0; x <= 256; x += 32) {
+    solCtx.beginPath(); solCtx.moveTo(x, 0); solCtx.lineTo(x, 256); solCtx.stroke();
   }
-  for (let i = 0; i < 30; i++) {
-    const rx = Math.random() * 512;
-    const ry = Math.random() * 512;
-    const rRad = 15 + Math.random() * 40;
-    const rGrad = rCtx.createRadialGradient(rx, ry, 0, rx, ry, rRad);
-    rGrad.addColorStop(0, 'rgba(100, 116, 139, 0.25)');
-    rGrad.addColorStop(1, 'transparent');
-    rCtx.fillStyle = rGrad;
-    rCtx.beginPath();
-    rCtx.arc(rx, ry, rRad, 0, Math.PI * 2);
-    rCtx.fill();
+  for (let y = 0; y <= 256; y += 32) {
+    solCtx.beginPath(); solCtx.moveTo(0, y); solCtx.lineTo(256, y); solCtx.stroke();
   }
-  const roofTex = new THREE.CanvasTexture(rCanvas);
-  roofTex.wrapS = THREE.RepeatWrapping;
-  roofTex.wrapT = THREE.RepeatWrapping;
+  solCtx.strokeStyle = '#38bdf8';
+  solCtx.lineWidth = 1;
+  solCtx.strokeRect(2, 2, 252, 252);
+  const solarTex = new THREE.CanvasTexture(solCanvas);
+  solarTex.wrapS = THREE.RepeatWrapping;
+  solarTex.wrapT = THREE.RepeatWrapping;
 
-  // 5. High-Resolution Road Asphalt Texture (512x512)
+  // 7. Asphalt & Hazard & GCP Textures
   const aCanvas = document.createElement('canvas');
-  aCanvas.width = 512;
-  aCanvas.height = 512;
+  aCanvas.width = 256;
+  aCanvas.height = 256;
   const aCtx = aCanvas.getContext('2d');
   aCtx.fillStyle = '#26292f';
-  aCtx.fillRect(0, 0, 512, 512);
-  const aImg = aCtx.getImageData(0, 0, 512, 512);
-  for (let i = 0; i < aImg.data.length; i += 4) {
-    const n = (Math.random() - 0.5) * 38;
-    aImg.data[i] = Math.min(255, Math.max(0, aImg.data[i] + n));
-    aImg.data[i + 1] = Math.min(255, Math.max(0, aImg.data[i + 1] + n));
-    aImg.data[i + 2] = Math.min(255, Math.max(0, aImg.data[i + 2] + n));
-  }
-  aCtx.putImageData(aImg, 0, 0);
+  aCtx.fillRect(0, 0, 256, 256);
   const asphaltTex = new THREE.CanvasTexture(aCanvas);
   asphaltTex.wrapS = THREE.RepeatWrapping;
   asphaltTex.wrapT = THREE.RepeatWrapping;
 
-  // 6. Yellow/Black Hazard Caution Stripes Texture (256x256)
   const hCanvas = document.createElement('canvas');
   hCanvas.width = 256;
   hCanvas.height = 256;
@@ -407,10 +601,7 @@ function getPhotogrammetryTextures() {
     hCtx.fill();
   }
   const hazardTex = new THREE.CanvasTexture(hCanvas);
-  hazardTex.wrapS = THREE.RepeatWrapping;
-  hazardTex.wrapT = THREE.RepeatWrapping;
 
-  // 7. Geodetic Ground Control Point (GCP) Target Texture (256x256)
   const gCanvas = document.createElement('canvas');
   gCanvas.width = 256;
   gCanvas.height = 256;
@@ -421,27 +612,18 @@ function getPhotogrammetryTextures() {
   gCtx.fillStyle = '#0f172a';
   gCtx.fillRect(128, 0, 128, 128);
   gCtx.fillRect(0, 128, 128, 128);
-  gCtx.strokeStyle = '#ef4444';
-  gCtx.lineWidth = 3;
-  gCtx.beginPath();
-  gCtx.moveTo(128, 0);
-  gCtx.lineTo(128, 256);
-  gCtx.moveTo(0, 128);
-  gCtx.lineTo(256, 128);
-  gCtx.stroke();
-  gCtx.beginPath();
-  gCtx.arc(128, 128, 14, 0, Math.PI * 2);
-  gCtx.stroke();
   const gcpTex = new THREE.CanvasTexture(gCanvas);
 
   textureCache.initialized = true;
   textureCache.terrain = terrainTex;
   textureCache.terrainNormal = terrainNorm;
-  textureCache.corrugated = corrugatedTex;
-  textureCache.corrugatedNormal = corrugatedNorm;
+  textureCache.heritageFacade = heritageFacadeTex;
+  textureCache.heritageNormal = heritageNormal;
+  textureCache.roof = roofTex;
   textureCache.concrete = concreteTex;
   textureCache.concreteNormal = concreteNorm;
-  textureCache.roof = roofTex;
+  textureCache.modernFacade = modernFacadeTex;
+  textureCache.solar = solarTex;
   textureCache.asphalt = asphaltTex;
   textureCache.hazard = hazardTex;
   textureCache.gcp = gcpTex;
@@ -471,7 +653,7 @@ export default function ModelViewer3D({
   const [renderMode, setRenderMode] = useState('textured'); // 'pointcloud' | 'mesh' | 'textured'
   const [colorMode, setColorMode] = useState('rgb'); // 'rgb' | 'elevation'
   const [wireframe, setWireframe] = useState(false);
-  const [pointSize, setPointSize] = useState(0.42);
+  const [pointSize, setPointSize] = useState(0.55);
   const [loading, setLoading] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -479,9 +661,9 @@ export default function ModelViewer3D({
   const [layers, setLayers] = useState({
     mesh: true,
     points: true,
-    frustums: true,
-    grid: true,
-    dynamicObjects: true,
+    frustums: false,
+    grid: false,
+    dynamicObjects: false,
     measurements: true
   });
   const [showLayersPanel, setShowLayersPanel] = useState(false);
@@ -519,8 +701,8 @@ export default function ModelViewer3D({
     if (!container) return;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf1f5f9);
-    scene.fog = new THREE.FogExp2(0xf1f5f9, 0.0035);
+    scene.background = new THREE.Color(0x06080d);
+    scene.fog = new THREE.FogExp2(0x06080d, 0.0016);
     sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(
@@ -529,9 +711,8 @@ export default function ModelViewer3D({
       0.1,
       4000
     );
-    camera.position.set(0, -42, 52);
     camera.up.set(0, 0, 1);
-    camera.lookAt(lookAtTargetRef.current);
+    lookAtTargetRef.current.set(2, 6, 8);
     cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ 
@@ -542,61 +723,67 @@ export default function ModelViewer3D({
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
+    renderer.toneMappingExposure = 1.18;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.innerHTML = '';
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    const hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x334155, 0.75);
-    hemiLight.position.set(0, 0, 120);
+    const hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x1e293b, 0.7);
+    hemiLight.position.set(0, 0, 140);
     scene.add(hemiLight);
 
-    const ambLight = new THREE.AmbientLight(0xffffff, 0.45);
+    const ambLight = new THREE.AmbientLight(0xffffff, 0.55);
     scene.add(ambLight);
 
-    const sunLight = new THREE.DirectionalLight(0xfffaed, 1.85);
-    sunLight.position.set(70, 50, 115);
+    // Natural daylight sun matching reference image (shining from upper-left toward bottom-right)
+    const sunLight = new THREE.DirectionalLight(0xfff8ee, 2.2);
+    sunLight.position.set(-75, 65, 110);
     sunLight.castShadow = true;
     sunLight.shadow.mapSize.width = 2048;
     sunLight.shadow.mapSize.height = 2048;
     sunLight.shadow.camera.near = 10;
-    sunLight.shadow.camera.far = 300;
-    sunLight.shadow.camera.left = -75;
-    sunLight.shadow.camera.right = 75;
-    sunLight.shadow.camera.top = 75;
-    sunLight.shadow.camera.bottom = -75;
+    sunLight.shadow.camera.far = 320;
+    sunLight.shadow.camera.left = -85;
+    sunLight.shadow.camera.right = 85;
+    sunLight.shadow.camera.top = 85;
+    sunLight.shadow.camera.bottom = -85;
     sunLight.shadow.bias = -0.0003;
     sunLight.shadow.normalBias = 0.02;
     scene.add(sunLight);
 
-    const fillLight = new THREE.DirectionalLight(0x93c5fd, 0.45);
-    fillLight.position.set(-60, -45, 30);
+    const fillLight = new THREE.DirectionalLight(0x94b8e8, 0.55);
+    fillLight.position.set(65, -55, 35);
     scene.add(fillLight);
 
-    const grid = new THREE.GridHelper(130, 65, 0x0284c7, 0xcbd5e1);
+    const grid = new THREE.GridHelper(140, 70, 0x0284c7, 0x1e293b);
     grid.rotation.x = Math.PI / 2;
-    grid.position.z = -0.02;
+    grid.position.z = -0.5;
+    grid.visible = layers.grid;
     scene.add(grid);
     gridRef.current = grid;
 
     const frustumsGroup = new THREE.Group();
+    frustumsGroup.visible = layers.frustums;
     scene.add(frustumsGroup);
     frustumsGroupRef.current = frustumsGroup;
 
     const dynObjGroup = new THREE.Group();
+    dynObjGroup.visible = layers.dynamicObjects;
     scene.add(dynObjGroup);
     dynamicObjectsGroupRef.current = dynObjGroup;
 
     const measGroup = new THREE.Group();
+    measGroup.visible = layers.measurements;
     scene.add(measGroup);
     measurementGroupRef.current = measGroup;
 
     let isDragging = false;
     let dragButton = 0;
     let prevMouse = { x: 0, y: 0 };
-    let spherical = { radius: 72, theta: Math.PI / 4, phi: Math.PI / 3 };
+    // Oblique elevated drone angle (~38° downward tilt, closer zoom framing filling the viewport)
+    let spherical = { radius: 56, theta: -Math.PI * 0.17, phi: Math.PI * 0.35 };
 
     const updateCameraPos = () => {
       const target = lookAtTargetRef.current;
@@ -850,22 +1037,30 @@ export default function ModelViewer3D({
       return new THREE.MeshStandardMaterial(matConfig);
     };
 
-    // 1. Surveyed Photogrammetric Terrain Mesh with Elevation & Aerial Orthomosaic
-    const terrainGeo = new THREE.PlaneGeometry(130, 130, 96, 96);
+    // 1. Surveyed Photogrammetric Terrain Mesh with Aerial Orthomosaic (140m x 140m)
+    const terrainGeo = new THREE.PlaneGeometry(140, 140, 100, 100);
     const pos = terrainGeo.attributes.position;
 
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i);
       const y = pos.getY(i);
 
-      let z = Math.sin(x * 0.045) * Math.cos(y * 0.045) * 4.2 + 
-              Math.sin(x * 0.11 + y * 0.08) * 1.6 + 
-              Math.cos(x * 0.03 - y * 0.05) * 1.2;
+      let z = Math.sin(x * 0.035) * Math.cos(y * 0.035) * 1.8 +
+              Math.sin(x * 0.09 + y * 0.07) * 0.8;
 
-      const distFromCenter = Math.sqrt(x * x + y * y);
-      if (distFromCenter < 38) {
-        const blend = Math.max(0, (distFromCenter - 22) / 16);
-        z = z * blend + 0.28 * (1 - blend);
+      // Elevated terrace plaza on upper-right (Z ≈ +2.4m)
+      if (x > 26 && x < 66 && y > -4 && y < 38) {
+        z = 2.4;
+      } else if (x > 22 && x < 26 && y > -4 && y < 38) {
+        const blend = (x - 22) / 4;
+        z = blend * 2.4;
+      } else {
+        // Flatten building footprints, roads, and parking lots
+        const distCenter = Math.sqrt(x * x + y * y);
+        if (distCenter < 44) {
+          const blend = Math.max(0, (distCenter - 24) / 20);
+          z = z * blend + 0.15 * (1 - blend);
+        }
       }
       pos.setZ(i, z);
     }
@@ -875,9 +1070,9 @@ export default function ModelViewer3D({
     const terrainMat = getPbrMat({
       map: textures.terrain,
       normalMap: textures.terrainNormal,
-      normalScale: new THREE.Vector2(0.5, 0.5),
-      roughness: 0.82,
-      metalness: 0.05,
+      normalScale: new THREE.Vector2(0.4, 0.4),
+      roughness: 0.85,
+      metalness: 0.04,
       side: THREE.DoubleSide
     }, 'high');
 
@@ -885,426 +1080,646 @@ export default function ModelViewer3D({
     terrainMesh.receiveShadow = true;
     group.add(terrainMesh);
 
-    // 2. Main Industrial Hangar / Facility Complex (-8, 6, 4.8)
-    const hangarGroup = new THREE.Group();
-    hangarGroup.position.set(-8, 6, 0);
+    // 2. Central Dominant Heritage Complex (Matching Reference Image!)
+    const complexGroup = new THREE.Group();
 
-    // Foundation Curb
-    const foundationGeo = new THREE.BoxGeometry(28.8, 22.8, 0.8);
-    const foundationMat = getPbrMat({
-      map: textures.concrete,
-      normalMap: textures.concreteNormal,
-      roughness: 0.72,
-      metalness: 0.08
-    }, 'high');
-    const foundationMesh = new THREE.Mesh(foundationGeo, foundationMat);
-    foundationMesh.position.set(0, 0, 0.4);
-    foundationMesh.castShadow = true;
-    foundationMesh.receiveShadow = true;
-    hangarGroup.add(foundationMesh);
+    // 2A. Dominant Central Tower (-2, 10, 0)
+    const towerGroup = new THREE.Group();
+    towerGroup.position.set(-2, 10, 0);
 
-    // Main Corrugated Steel Hangar Body (28 x 22 x 9m)
-    const hangarBodyGeo = new THREE.BoxGeometry(28, 22, 9);
-    const hangarMat = getPbrMat({
-      map: textures.corrugated,
-      normalMap: textures.corrugatedNormal,
-      normalScale: new THREE.Vector2(0.8, 0.8),
-      roughness: 0.42,
-      metalness: 0.45
-    }, 'high');
-    const hangarBody = new THREE.Mesh(hangarBodyGeo, hangarMat);
-    hangarBody.position.set(0, 0, 4.8);
-    hangarBody.castShadow = true;
-    hangarBody.receiveShadow = true;
-    hangarGroup.add(hangarBody);
-
-    // Corner Structural Columns
-    const colGeom = new THREE.BoxGeometry(0.7, 0.7, 9.2);
-    const colMat = getPbrMat({ color: 0x334155, roughness: 0.35, metalness: 0.6 }, 'high');
-    [
-      [-14, -11], [14, -11], [-14, 11], [14, 11]
-    ].forEach(([cx, cy]) => {
-      const col = new THREE.Mesh(colGeom, colMat);
-      col.position.set(cx, cy, 4.9);
-      col.castShadow = true;
-      hangarGroup.add(col);
-    });
-
-    // Detailed Gabled Pitched Roof with Overhanging Eaves
-    const rw = 29.6, rl = 23.6, rh = 3.6;
-    const roofGeo = new THREE.BufferGeometry();
-    const roofVertices = new Float32Array([
-      // Left slope
-      -rw/2, -rl/2, 0,    0, -rl/2, rh,   0, rl/2, rh,
-      -rw/2, -rl/2, 0,    0, rl/2, rh,   -rw/2, rl/2, 0,
-      // Right slope
-      0, -rl/2, rh,    rw/2, -rl/2, 0,    rw/2, rl/2, 0,
-      0, -rl/2, rh,    rw/2, rl/2, 0,     0, rl/2, rh,
-      // Front gable
-      -rw/2, -rl/2, 0,    rw/2, -rl/2, 0,    0, -rl/2, rh,
-      // Back gable
-      -rw/2, rl/2, 0,     0, rl/2, rh,       rw/2, rl/2, 0
-    ]);
-    roofGeo.setAttribute('position', new THREE.BufferAttribute(roofVertices, 3));
-    roofGeo.computeVertexNormals();
-
-    const roofMat = getPbrMat({
-      map: textures.roof,
-      roughness: 0.45,
-      metalness: 0.4
-    }, 'high');
-    const roofMesh = new THREE.Mesh(roofGeo, roofMat);
-    roofMesh.position.set(0, 0, 9.3);
-    roofMesh.castShadow = true;
-    roofMesh.receiveShadow = true;
-    hangarGroup.add(roofMesh);
-
-    // Rooftop Industrial Skylight Monitor
-    const skylightGeo = new THREE.BoxGeometry(16, 2.8, 0.9);
-    const skylightMat = getPbrMat({
-      color: 0x93c5fd,
-      roughness: 0.15,
-      metalness: 0.8,
-      transparent: true,
-      opacity: 0.85
-    }, 'high');
-    const skylightMesh = new THREE.Mesh(skylightGeo, skylightMat);
-    skylightMesh.position.set(0, 0, 13.1);
-    skylightMesh.castShadow = true;
-    hangarGroup.add(skylightMesh);
-
-    // 3 Industrial Shutter Bay Doors with Hazard Thresholds & Bollards
-    for (let d = -1; d <= 1; d++) {
-      const doorX = d * 7.6;
-      const frameMesh = new THREE.Mesh(
-        new THREE.BoxGeometry(5.8, 0.5, 6.6),
-        getPbrMat({ color: 0x1e293b, roughness: 0.4, metalness: 0.7 }, 'high')
-      );
-      frameMesh.position.set(doorX, -11.05, 3.5);
-      hangarGroup.add(frameMesh);
-
-      const doorLeaf = new THREE.Mesh(
-        new THREE.BoxGeometry(5.4, 0.3, 6.2),
-        getPbrMat({
-          map: textures.corrugated,
-          roughness: 0.45,
-          metalness: 0.4
-        }, 'high')
-      );
-      doorLeaf.position.set(doorX, -11.1, 3.4);
-      doorLeaf.castShadow = true;
-      hangarGroup.add(doorLeaf);
-
-      const hazardSill = new THREE.Mesh(
-        new THREE.BoxGeometry(5.8, 0.8, 0.15),
-        getPbrMat({ map: textures.hazard, roughness: 0.5, metalness: 0.2 }, 'high')
-      );
-      hazardSill.position.set(doorX, -11.4, 0.35);
-      hangarGroup.add(hazardSill);
-
-      [-3.2, 3.2].forEach(bx => {
-        const bollard = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.16, 0.16, 1.1, 16),
-          getPbrMat({ color: 0xfacc15, roughness: 0.3, metalness: 0.5 }, 'high')
-        );
-        bollard.position.set(doorX + bx, -11.5, 0.85);
-        bollard.rotation.x = Math.PI / 2;
-        bollard.castShadow = true;
-        hangarGroup.add(bollard);
-      });
-
-      const lamp = new THREE.Mesh(
-        new THREE.BoxGeometry(0.8, 0.4, 0.3),
-        getPbrMat({ color: 0x334155, roughness: 0.2, metalness: 0.8 }, 'high')
-      );
-      lamp.position.set(doorX, -11.2, 7.0);
-      hangarGroup.add(lamp);
-    }
-
-    // Gable Ventilation Louvers
-    [-1, 1].forEach(dir => {
-      const louver = new THREE.Mesh(
-        new THREE.BoxGeometry(2.4, 0.2, 1.4),
-        getPbrMat({ color: 0x1e293b, roughness: 0.6, metalness: 0.5 }, 'high')
-      );
-      louver.position.set(0, dir * 11.85, 11.2);
-      hangarGroup.add(louver);
-    });
-
-    group.add(hangarGroup);
-
-    // 3. Operations Annex Building (18, 4, 5.8)
-    const annexGroup = new THREE.Group();
-    annexGroup.position.set(18, 4, 0);
-
-    const plinth = new THREE.Mesh(
-      new THREE.BoxGeometry(16.4, 14.4, 0.8),
-      getPbrMat({ color: 0x334155, roughness: 0.8, metalness: 0.2 }, 'high')
+    // Concrete plinth foundation
+    const towerPlinth = new THREE.Mesh(
+      new THREE.BoxGeometry(18.6, 22.6, 0.9),
+      getPbrMat({ map: textures.concrete, normalMap: textures.concreteNormal, roughness: 0.7, metalness: 0.1 }, 'high')
     );
-    plinth.position.set(0, 0, 0.4);
-    plinth.castShadow = true;
-    annexGroup.add(plinth);
+    towerPlinth.position.set(0, 0, 0.45);
+    towerPlinth.castShadow = true;
+    towerPlinth.receiveShadow = true;
+    towerGroup.add(towerPlinth);
 
-    const annexBody = new THREE.Mesh(
-      new THREE.BoxGeometry(16, 14, 11),
+    // Lower Tier Body (Floors 1-3: 14m tall)
+    const towerLower = new THREE.Mesh(
+      new THREE.BoxGeometry(18.0, 22.0, 14.0),
       getPbrMat({
-        map: textures.concrete,
-        normalMap: textures.concreteNormal,
-        roughness: 0.62,
-        metalness: 0.1
+        map: textures.heritageFacade,
+        normalMap: textures.heritageNormal,
+        normalScale: new THREE.Vector2(0.7, 0.7),
+        roughness: 0.65,
+        metalness: 0.12
       }, 'high')
     );
-    annexBody.position.set(0, 0, 5.8);
-    annexBody.castShadow = true;
-    annexBody.receiveShadow = true;
-    annexGroup.add(annexBody);
+    towerLower.position.set(0, 0, 7.45);
+    towerLower.castShadow = true;
+    towerLower.receiveShadow = true;
+    towerGroup.add(towerLower);
 
-    const parapet = new THREE.Mesh(
-      new THREE.BoxGeometry(16.3, 14.3, 0.3),
-      getPbrMat({ color: 0x64748b, roughness: 0.4, metalness: 0.6 }, 'high')
+    // Intermediate Protruding Stone Cornice
+    const towerMidCornice = new THREE.Mesh(
+      new THREE.BoxGeometry(18.6, 22.6, 0.6),
+      getPbrMat({ color: 0xeae6df, roughness: 0.5, metalness: 0.15 }, 'high')
     );
-    parapet.position.set(0, 0, 11.45);
-    annexGroup.add(parapet);
+    towerMidCornice.position.set(0, 0, 14.75);
+    towerMidCornice.castShadow = true;
+    towerGroup.add(towerMidCornice);
 
-    const glassMat = getPbrMat({
-      color: 0x0f172a,
-      roughness: 0.08,
-      metalness: 0.9,
-      transparent: true,
-      opacity: 0.88
-    }, 'high');
+    // Upper Tier Body (Floors 4-7: 15m tall)
+    const towerUpper = new THREE.Mesh(
+      new THREE.BoxGeometry(17.4, 21.4, 15.0),
+      getPbrMat({
+        map: textures.heritageFacade,
+        normalMap: textures.heritageNormal,
+        normalScale: new THREE.Vector2(0.7, 0.7),
+        roughness: 0.65,
+        metalness: 0.12
+      }, 'high')
+    );
+    towerUpper.position.set(0, 0, 22.55);
+    towerUpper.castShadow = true;
+    towerUpper.receiveShadow = true;
+    towerGroup.add(towerUpper);
 
-    [3.8, 7.8].forEach(floorZ => {
-      const winMesh = new THREE.Mesh(
-        new THREE.BoxGeometry(16.25, 14.25, 1.8),
-        glassMat
+    // Top Roof Cornice
+    const towerTopCornice = new THREE.Mesh(
+      new THREE.BoxGeometry(18.0, 22.0, 0.7),
+      getPbrMat({ color: 0xeae6df, roughness: 0.5, metalness: 0.15 }, 'high')
+    );
+    towerTopCornice.position.set(0, 0, 30.4);
+    towerTopCornice.castShadow = true;
+    towerGroup.add(towerTopCornice);
+
+    // Tower Roof Parapet Wall & Weathered Green Roof Surface
+    const towerParapet = new THREE.Mesh(
+      new THREE.BoxGeometry(17.6, 21.6, 1.2),
+      getPbrMat({ color: 0xd6cfc7, roughness: 0.6, metalness: 0.1 }, 'high')
+    );
+    towerParapet.position.set(0, 0, 31.0);
+    towerGroup.add(towerParapet);
+
+    const towerRoofMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(16.6, 20.6),
+      getPbrMat({
+        map: textures.roof,
+        roughness: 0.75,
+        metalness: 0.08,
+        side: THREE.DoubleSide
+      }, 'high')
+    );
+    towerRoofMesh.position.set(0, 0, 30.5);
+    towerRoofMesh.receiveShadow = true;
+    towerGroup.add(towerRoofMesh);
+
+    // 4 Corner Decorative Turrets / Battlements on Parapet
+    [[-8.4, -10.4], [8.4, -10.4], [-8.4, 10.4], [8.4, 10.4]].forEach(([tx, ty]) => {
+      const turret = new THREE.Mesh(
+        new THREE.BoxGeometry(1.2, 1.2, 2.0),
+        getPbrMat({ color: 0xeae6df, roughness: 0.5, metalness: 0.15 }, 'high')
       );
-      winMesh.position.set(0, 0, floorZ);
-      annexGroup.add(winMesh);
-
-      for (let mx = -7.2; mx <= 7.2; mx += 2.4) {
-        const mullion = new THREE.Mesh(
-          new THREE.BoxGeometry(0.12, 14.3, 1.82),
-          getPbrMat({ color: 0x1e293b, roughness: 0.3, metalness: 0.8 }, 'high')
-        );
-        mullion.position.set(mx, 0, floorZ);
-        annexGroup.add(mullion);
-      }
+      turret.position.set(tx, ty, 31.6);
+      turret.castShadow = true;
+      towerGroup.add(turret);
     });
 
-    const bulkhead = new THREE.Mesh(
-      new THREE.BoxGeometry(4.8, 4.2, 2.5),
+    // Rooftop Mechanical Penthouse / Elevator Overrun
+    const penthouse = new THREE.Mesh(
+      new THREE.BoxGeometry(7.2, 8.4, 3.8),
+      getPbrMat({ map: textures.concrete, roughness: 0.7, metalness: 0.15 }, 'medium')
+    );
+    penthouse.position.set(0, 4.0, 32.4);
+    penthouse.castShadow = true;
+    towerGroup.add(penthouse);
+
+    // Rooftop Solar Photovoltaic Panel Array (Facing South, angled at 25°)
+    const solarRackGroup = new THREE.Group();
+    solarRackGroup.position.set(-3.8, -4.5, 30.7);
+    solarRackGroup.rotation.x = -0.44; // angled south
+    for (let r = 0; r < 2; r++) {
+      for (let c = 0; c < 5; c++) {
+        const panel = new THREE.Mesh(
+          new THREE.PlaneGeometry(1.4, 2.2),
+          getPbrMat({ map: textures.solar, roughness: 0.2, metalness: 0.8, side: THREE.DoubleSide }, 'high')
+        );
+        panel.position.set(c * 1.55, r * 2.35, 0);
+        panel.castShadow = true;
+        solarRackGroup.add(panel);
+      }
+    }
+    towerGroup.add(solarRackGroup);
+
+    // Rooftop Dual HVAC Air Chiller Units with Fans
+    [-1, 1].forEach(dir => {
+      const chiller = new THREE.Mesh(
+        new THREE.BoxGeometry(2.4, 3.2, 1.6),
+        getPbrMat({ color: 0x94a3b8, roughness: 0.45, metalness: 0.6 }, 'medium')
+      );
+      chiller.position.set(4.5, dir * 2.4 - 2.0, 31.3);
+      chiller.castShadow = true;
+      towerGroup.add(chiller);
+
+      const fan = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.7, 0.7, 0.25, 16),
+        getPbrMat({ color: 0x334155, roughness: 0.3, metalness: 0.7 }, 'medium')
+      );
+      fan.position.set(4.5, dir * 2.4 - 2.0, 32.2);
+      fan.rotation.x = Math.PI / 2;
+      towerGroup.add(fan);
+    });
+
+    // Rooftop Communications Antenna Mast with Red Pulsing Beacon
+    const mastGeo = new THREE.CylinderGeometry(0.08, 0.2, 12, 8);
+    const mast = new THREE.Mesh(mastGeo, getPbrMat({ color: 0x94a3b8, roughness: 0.3, metalness: 0.8 }, 'medium'));
+    mast.position.set(0, 4.0, 38.3);
+    mast.rotation.x = Math.PI / 2;
+    mast.castShadow = true;
+    towerGroup.add(mast);
+
+    const beaconMat = new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.95 });
+    beaconMatRef.current = beaconMat;
+    const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.4, 12, 12), beaconMat);
+    beacon.position.set(0, 4.0, 44.5);
+    towerGroup.add(beacon);
+
+    complexGroup.add(towerGroup);
+
+    // 2B. East Long Wing (Extends Eastward: 44m length, 13m width, 14m height ~4 stories)
+    const eastWingGroup = new THREE.Group();
+    eastWingGroup.position.set(25, 7, 0);
+
+    const eastPlinth = new THREE.Mesh(
+      new THREE.BoxGeometry(44.4, 13.4, 0.8),
+      getPbrMat({ map: textures.concrete, roughness: 0.7, metalness: 0.1 }, 'high')
+    );
+    eastPlinth.position.set(0, 0, 0.4);
+    eastPlinth.castShadow = true;
+    eastWingGroup.add(eastPlinth);
+
+    const eastBody = new THREE.Mesh(
+      new THREE.BoxGeometry(44.0, 13.0, 14.0),
       getPbrMat({
-        map: textures.concrete,
-        roughness: 0.7,
+        map: textures.heritageFacade,
+        normalMap: textures.heritageNormal,
+        normalScale: new THREE.Vector2(0.7, 0.7),
+        roughness: 0.65,
+        metalness: 0.12
+      }, 'high')
+    );
+    eastBody.position.set(0, 0, 7.4);
+    eastBody.castShadow = true;
+    eastBody.receiveShadow = true;
+    eastWingGroup.add(eastBody);
+
+    const eastRoof = new THREE.Mesh(
+      new THREE.PlaneGeometry(43.2, 12.2),
+      getPbrMat({ map: textures.roof, roughness: 0.75, metalness: 0.08, side: THREE.DoubleSide }, 'high')
+    );
+    eastRoof.position.set(0, 0, 14.45);
+    eastRoof.receiveShadow = true;
+    eastWingGroup.add(eastRoof);
+
+    const eastParapet = new THREE.Mesh(
+      new THREE.BoxGeometry(44.2, 13.2, 0.9),
+      getPbrMat({ color: 0xd6cfc7, roughness: 0.6, metalness: 0.1 }, 'high')
+    );
+    eastParapet.position.set(0, 0, 14.85);
+    eastWingGroup.add(eastParapet);
+
+    // Rooftop Gazebo/Pavilion Towers with Flared Pyramidal Roofs (Seen in Reference!)
+    [-11, 15].forEach(px => {
+      const pavBase = new THREE.Mesh(
+        new THREE.BoxGeometry(5.2, 5.2, 3.6),
+        getPbrMat({ map: textures.heritageFacade, roughness: 0.65, metalness: 0.12 }, 'high')
+      );
+      pavBase.position.set(px, 0, 16.2);
+      pavBase.castShadow = true;
+      eastWingGroup.add(pavBase);
+
+      const pavRoof = new THREE.Mesh(
+        new THREE.ConeGeometry(4.2, 2.4, 4),
+        getPbrMat({ color: 0x475569, roughness: 0.5, metalness: 0.4 }, 'high')
+      );
+      pavRoof.position.set(px, 0, 19.2);
+      pavRoof.rotation.y = Math.PI / 4;
+      pavRoof.rotation.x = -Math.PI / 2;
+      pavRoof.castShadow = true;
+      eastWingGroup.add(pavRoof);
+
+      const finial = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.08, 0.15, 1.2, 8),
+        getPbrMat({ color: 0xe2e8f0, roughness: 0.3, metalness: 0.8 }, 'high')
+      );
+      finial.position.set(px, 0, 21.0);
+      finial.rotation.x = Math.PI / 2;
+      eastWingGroup.add(finial);
+    });
+
+    complexGroup.add(eastWingGroup);
+
+    // 2C. South Wing (Forms L-Enclosure: 22m length, 12m width, 11m height ~3 stories)
+    const southWingGroup = new THREE.Group();
+    southWingGroup.position.set(9, -8, 0);
+
+    const southBody = new THREE.Mesh(
+      new THREE.BoxGeometry(22.0, 12.0, 11.0),
+      getPbrMat({
+        map: textures.heritageFacade,
+        normalMap: textures.heritageNormal,
+        normalScale: new THREE.Vector2(0.7, 0.7),
+        roughness: 0.65,
+        metalness: 0.12
+      }, 'high')
+    );
+    southBody.position.set(0, 0, 5.9);
+    southBody.castShadow = true;
+    southBody.receiveShadow = true;
+    southWingGroup.add(southBody);
+
+    const southRoof = new THREE.Mesh(
+      new THREE.PlaneGeometry(21.2, 11.2),
+      getPbrMat({ map: textures.roof, roughness: 0.75, metalness: 0.08, side: THREE.DoubleSide }, 'high')
+    );
+    southRoof.position.set(0, 0, 11.45);
+    southRoof.receiveShadow = true;
+    southWingGroup.add(southRoof);
+
+    const southParapet = new THREE.Mesh(
+      new THREE.BoxGeometry(22.2, 12.2, 0.9),
+      getPbrMat({ color: 0xd6cfc7, roughness: 0.6, metalness: 0.1 }, 'high')
+    );
+    southParapet.position.set(0, 0, 11.85);
+    southWingGroup.add(southParapet);
+
+    // Stepped Corner Pavilion on South Wing
+    const sPavBase = new THREE.Mesh(
+      new THREE.BoxGeometry(5.4, 5.4, 3.4),
+      getPbrMat({ map: textures.heritageFacade, roughness: 0.65, metalness: 0.12 }, 'high')
+    );
+    sPavBase.position.set(-7.5, 0, 13.1);
+    sPavBase.castShadow = true;
+    southWingGroup.add(sPavBase);
+
+    const sPavRoof = new THREE.Mesh(
+      new THREE.ConeGeometry(4.4, 2.4, 4),
+      getPbrMat({ color: 0x475569, roughness: 0.5, metalness: 0.4 }, 'high')
+    );
+    sPavRoof.position.set(-7.5, 0, 16.0);
+    sPavRoof.rotation.y = Math.PI / 4;
+    sPavRoof.rotation.x = -Math.PI / 2;
+    sPavRoof.castShadow = true;
+    southWingGroup.add(sPavRoof);
+
+    complexGroup.add(southWingGroup);
+
+    // 2D. Grand Entrance Portico / Porte-Cochère (Front Center: -2, -1.8, 0)
+    const porticoGroup = new THREE.Group();
+    porticoGroup.position.set(-2, -1.8, 0);
+
+    const porticoCanopy = new THREE.Mesh(
+      new THREE.BoxGeometry(8.6, 5.4, 6.8),
+      getPbrMat({ color: 0xe4dfd7, roughness: 0.6, metalness: 0.15 }, 'high')
+    );
+    porticoCanopy.position.set(0, 0, 3.4);
+    porticoCanopy.castShadow = true;
+    porticoGroup.add(porticoCanopy);
+
+    // Arched portal opening
+    const portalArch = new THREE.Mesh(
+      new THREE.BoxGeometry(5.6, 5.6, 4.4),
+      getPbrMat({ color: 0x0f172a, roughness: 0.8, metalness: 0.1 }, 'high')
+    );
+    portalArch.position.set(0, 0, 2.2);
+    porticoGroup.add(portalArch);
+
+    complexGroup.add(porticoGroup);
+    group.add(complexGroup);
+
+    // 3. Western Modern Complex & Iconic Curved Lattice Canopy (Left of scene)
+    const westGroup = new THREE.Group();
+    westGroup.position.set(-36, 14, 0);
+
+    // Modern 3-story office building with brise-soleil perforated screen facade
+    const westBuilding = new THREE.Mesh(
+      new THREE.BoxGeometry(18.0, 24.0, 12.0),
+      getPbrMat({
+        map: textures.modernFacade,
+        roughness: 0.55,
+        metalness: 0.35
+      }, 'high')
+    );
+    westBuilding.position.set(0, 0, 6.4);
+    westBuilding.castShadow = true;
+    westBuilding.receiveShadow = true;
+    westGroup.add(westBuilding);
+
+    const westParapet = new THREE.Mesh(
+      new THREE.BoxGeometry(18.2, 24.2, 0.8),
+      getPbrMat({ color: 0x94a3b8, roughness: 0.4, metalness: 0.6 }, 'high')
+    );
+    westParapet.position.set(0, 0, 12.8);
+    westGroup.add(westParapet);
+
+    group.add(westGroup);
+
+    // 3B. Iconic Curved White Lattice Canopy (Located at -32, -14, 0 - exactly matching reference!)
+    const canopyGroup = new THREE.Group();
+    canopyGroup.position.set(-32, -14, 0);
+
+    const archMat = getPbrMat({ color: 0xf8fafc, roughness: 0.25, metalness: 0.25 }, 'high');
+    const ribCount = 8;
+    const archWidth = 16.0;
+    const archRadius = 8.0;
+
+    for (let r = 0; r < ribCount; r++) {
+      const ry = (r - (ribCount - 1) / 2) * 2.4;
+      // Curved arch rib using TorusGeometry arc segment
+      const archRib = new THREE.Mesh(
+        new THREE.TorusGeometry(archRadius, 0.22, 10, 32, Math.PI),
+        archMat
+      );
+      archRib.position.set(0, ry, 0.3);
+      archRib.rotation.y = Math.PI / 2;
+      archRib.rotation.x = Math.PI / 2;
+      archRib.castShadow = true;
+      canopyGroup.add(archRib);
+
+      // Vertical support posts
+      [-archWidth / 2, archWidth / 2].forEach(px => {
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 2.2, 8), archMat);
+        post.position.set(px, ry, 1.1);
+        post.rotation.x = Math.PI / 2;
+        post.castShadow = true;
+        canopyGroup.add(post);
+      });
+    }
+
+    // Longitudinal connecting tubular purlins
+    for (let angle = 0.2; angle < Math.PI; angle += 0.45) {
+      const pz = Math.sin(angle) * archRadius + 0.3;
+      const px = Math.cos(angle) * archRadius;
+      const purlin = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.1, 0.1, ribCount * 2.4, 8),
+        archMat
+      );
+      purlin.position.set(px, 0, pz);
+      purlin.rotation.x = 0;
+      canopyGroup.add(purlin);
+    }
+
+    group.add(canopyGroup);
+
+    // 4. Eastern Multi-Tier Elevated Promenade & Terraces (Upper-Right)
+    const terraceGroup = new THREE.Group();
+    terraceGroup.position.set(45, 18, 2.4);
+
+    // Retaining walls supporting the elevated terrace
+    const retWall1 = new THREE.Mesh(
+      new THREE.BoxGeometry(40.0, 0.8, 2.6),
+      getPbrMat({ map: textures.concrete, roughness: 0.7, metalness: 0.1 }, 'high')
+    );
+    retWall1.position.set(0, -21.0, -1.1);
+    retWall1.castShadow = true;
+    terraceGroup.add(retWall1);
+
+    const retWall2 = new THREE.Mesh(
+      new THREE.BoxGeometry(0.8, 42.0, 2.6),
+      getPbrMat({ map: textures.concrete, roughness: 0.7, metalness: 0.1 }, 'high')
+    );
+    retWall2.position.set(-20.0, 0, -1.1);
+    retWall2.castShadow = true;
+    terraceGroup.add(retWall2);
+
+    // Pedestrian Walkway Bridge spanning to East Wing
+    const bridge = new THREE.Mesh(
+      new THREE.BoxGeometry(10.0, 4.2, 0.7),
+      getPbrMat({ color: 0xcfd8dc, roughness: 0.6, metalness: 0.2 }, 'high')
+    );
+    bridge.position.set(-24.0, -11.0, 0.1);
+    bridge.castShadow = true;
+    terraceGroup.add(bridge);
+
+    // Open-Air Square Gazebos / Pavilions on Elevated Terrace (from reference!)
+    [[-8, 8], [12, 8]].forEach(([gx, gy]) => {
+      // 4 stone pillars
+      [[-2.2, -2.2], [2.2, -2.2], [-2.2, 2.2], [2.2, 2.2]].forEach(([cx, cy]) => {
+        const pillar = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.2, 0.25, 4.2, 8),
+          getPbrMat({ color: 0xe2e8f0, roughness: 0.4, metalness: 0.2 }, 'high')
+        );
+        pillar.position.set(gx + cx, gy + cy, 2.1);
+        pillar.rotation.x = Math.PI / 2;
+        pillar.castShadow = true;
+        terraceGroup.add(pillar);
+      });
+
+      // Flared pyramidal roof cap
+      const cap = new THREE.Mesh(
+        new THREE.ConeGeometry(5.2, 2.6, 4),
+        getPbrMat({ color: 0x475569, roughness: 0.5, metalness: 0.4 }, 'high')
+      );
+      cap.position.set(gx, gy, 5.4);
+      cap.rotation.y = Math.PI / 4;
+      cap.rotation.x = -Math.PI / 2;
+      cap.castShadow = true;
+      terraceGroup.add(cap);
+    });
+
+    // 3D Geometric Raised Boxwood Hedge Maze Geometry (matching the clover/X pattern)
+    [[-3, 4], [7, 4]].forEach(([hx, hy]) => {
+      const hedgeMat = getPbrMat({ color: 0x1b3b1a, roughness: 0.85, metalness: 0.05 }, 'high');
+      const hBar1 = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.9, 0.8), hedgeMat);
+      hBar1.position.set(hx, hy, 0.4);
+      hBar1.rotation.z = Math.PI / 4;
+      hBar1.castShadow = true;
+      terraceGroup.add(hBar1);
+
+      const hBar2 = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.9, 0.8), hedgeMat);
+      hBar2.position.set(hx, hy, 0.4);
+      hBar2.rotation.z = -Math.PI / 4;
+      hBar2.castShadow = true;
+      terraceGroup.add(hBar2);
+    });
+
+    group.add(terraceGroup);
+
+    // 5. Northern Institutional Office Slab (Background Complex: 0, 44, 0)
+    const northGroup = new THREE.Group();
+    northGroup.position.set(0, 44, 0);
+
+    const northBody = new THREE.Mesh(
+      new THREE.BoxGeometry(56.0, 16.0, 26.0),
+      getPbrMat({
+        color: 0xe2e8f0,
+        roughness: 0.65,
         metalness: 0.15
       }, 'high')
     );
-    bulkhead.position.set(-3.5, 3.2, 12.5);
-    bulkhead.castShadow = true;
-    annexGroup.add(bulkhead);
+    northBody.position.set(0, 0, 13.4);
+    northBody.castShadow = true;
+    northBody.receiveShadow = true;
+    northGroup.add(northBody);
 
-    for (let c = 0; c < 2; c++) {
-      const chX = 2.8 + c * 3.4;
-      const chY = -1.5;
-      const chiller = new THREE.Mesh(
-        new THREE.BoxGeometry(2.6, 3.6, 1.8),
-        getPbrMat({ color: 0x94a3b8, roughness: 0.45, metalness: 0.5 }, 'medium')
+    // Repeating horizontal window ribbons
+    for (let wz = 4.0; wz <= 24.0; wz += 3.6) {
+      const winRibbon = new THREE.Mesh(
+        new THREE.BoxGeometry(56.2, 16.2, 1.6),
+        getPbrMat({ color: 0x0f172a, roughness: 0.1, metalness: 0.9 }, 'high')
       );
-      chiller.position.set(chX, chY, 12.2);
-      chiller.castShadow = true;
-      annexGroup.add(chiller);
+      winRibbon.position.set(0, 0, wz);
+      northGroup.add(winRibbon);
+    }
 
-      [-0.8, 0.8].forEach(fy => {
-        const fan = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.65, 0.65, 0.35, 16),
-          getPbrMat({ color: 0x334155, roughness: 0.3, metalness: 0.7 }, 'medium')
-        );
-        fan.position.set(chX, chY + fy, 13.2);
-        fan.rotation.x = Math.PI / 2;
-        annexGroup.add(fan);
+    const northRoof = new THREE.Mesh(
+      new THREE.PlaneGeometry(55.0, 15.0),
+      getPbrMat({ map: textures.roof, roughness: 0.75, metalness: 0.08, side: THREE.DoubleSide }, 'high')
+    );
+    northRoof.position.set(0, 0, 26.45);
+    northGroup.add(northRoof);
+
+    group.add(northGroup);
+
+    // 6. Realistic 3D Vehicles (Parked in Lots & Operating on Roadway)
+    const carGroup = new THREE.Group();
+    const carPalette = [0xf8fafc, 0xcfd8dc, 0x334155, 0x991b1b, 0x1e3a8a, 0x111827];
+
+    const createCar = (cx, cy, cz, rotZ, colorHex) => {
+      const cSub = new THREE.Group();
+      cSub.position.set(cx, cy, cz);
+      cSub.rotation.z = rotZ;
+
+      // Chassis body
+      const chassis = new THREE.Mesh(
+        new THREE.BoxGeometry(4.2, 1.9, 0.9),
+        getPbrMat({ color: colorHex, roughness: 0.35, metalness: 0.7 }, 'high')
+      );
+      chassis.position.set(0, 0, 0.55);
+      chassis.castShadow = true;
+      cSub.add(chassis);
+
+      // Cabin / windshield greenhouse
+      const cabin = new THREE.Mesh(
+        new THREE.BoxGeometry(2.4, 1.6, 0.75),
+        getPbrMat({ color: 0x0f172a, roughness: 0.1, metalness: 0.9 }, 'high')
+      );
+      cabin.position.set(-0.2, 0, 1.35);
+      cabin.castShadow = true;
+      cSub.add(cabin);
+
+      // 4 wheels
+      const wheelMat = getPbrMat({ color: 0x111827, roughness: 0.9, metalness: 0.1 }, 'high');
+      [[-1.3, -0.95], [1.3, -0.95], [-1.3, 0.95], [1.3, 0.95]].forEach(([wx, wy]) => {
+        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.25, 8), wheelMat);
+        wheel.position.set(wx, wy, 0.35);
+        wheel.rotation.x = Math.PI / 2;
+        cSub.add(wheel);
       });
+
+      return cSub;
+    };
+
+    // 6A. Top-Left Parking Lot (18 parked cars)
+    for (let i = 0; i < 18; i++) {
+      const row = i < 9 ? 0 : 1;
+      const col = i % 9;
+      const px = -34 + col * 2.8;
+      const py = 26 + row * 8.5;
+      const clr = carPalette[i % carPalette.length];
+      carGroup.add(createCar(px, py, 0.2, Math.PI * 0.35, clr));
     }
 
-    const duct = new THREE.Mesh(
-      new THREE.BoxGeometry(5.8, 0.8, 0.8),
-      getPbrMat({ color: 0xc4cbd1, roughness: 0.3, metalness: 0.75 }, 'medium')
-    );
-    duct.position.set(3.5, 1.2, 11.8);
-    annexGroup.add(duct);
-
-    const railMat = getPbrMat({ color: 0xe2e8f0, roughness: 0.3, metalness: 0.8 }, 'high');
-    const rail1 = new THREE.Mesh(new THREE.BoxGeometry(15.6, 0.1, 0.9), railMat);
-    rail1.position.set(0, -6.8, 11.8);
-    annexGroup.add(rail1);
-    const rail2 = new THREE.Mesh(new THREE.BoxGeometry(15.6, 0.1, 0.9), railMat);
-    rail2.position.set(0, 6.8, 11.8);
-    annexGroup.add(rail2);
-
-    group.add(annexGroup);
-
-    // 4. Perimeter Access Road with 3D Curbs & Crown (4, 2, 0.35)
-    const roadGroup = new THREE.Group();
-    roadGroup.position.set(4, 2, 0.35);
-
-    const roadGeo = new THREE.RingGeometry(24, 31, 64);
-    const roadMat = getPbrMat({
-      map: textures.asphalt,
-      normalMap: textures.terrainNormal,
-      roughness: 0.88,
-      metalness: 0.05,
-      side: THREE.DoubleSide
-    }, 'high');
-    const roadMesh = new THREE.Mesh(roadGeo, roadMat);
-    roadMesh.receiveShadow = true;
-    roadGroup.add(roadMesh);
-
-    const dashRing = new THREE.Mesh(
-      new THREE.RingGeometry(27.3, 27.7, 48),
-      new THREE.MeshBasicMaterial({ color: 0xf8fafc, side: THREE.DoubleSide })
-    );
-    dashRing.position.z = 0.03;
-    roadGroup.add(dashRing);
-
-    const innerCurb = new THREE.Mesh(
-      new THREE.RingGeometry(23.7, 24.1, 64),
-      getPbrMat({ color: 0x94a3b8, roughness: 0.7, metalness: 0.1, side: THREE.DoubleSide }, 'high')
-    );
-    innerCurb.position.z = 0.05;
-    roadGroup.add(innerCurb);
-
-    const outerCurb = new THREE.Mesh(
-      new THREE.RingGeometry(30.9, 31.3, 64),
-      getPbrMat({ color: 0x94a3b8, roughness: 0.7, metalness: 0.1, side: THREE.DoubleSide }, 'high')
-    );
-    outerCurb.position.z = 0.05;
-    roadGroup.add(outerCurb);
-
-    group.add(roadGroup);
-
-    // 5. Drone Helipad / Launchpad with Concrete Slabs (0, -22, 0.45)
-    const heliGroup = new THREE.Group();
-    heliGroup.position.set(0, -22, 0.45);
-
-    const padMesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(8.2, 8.2, 0.35, 32),
-      getPbrMat({
-        map: textures.concrete,
-        normalMap: textures.concreteNormal,
-        roughness: 0.75,
-        metalness: 0.05
-      }, 'high')
-    );
-    padMesh.rotation.x = Math.PI / 2;
-    padMesh.receiveShadow = true;
-    heliGroup.add(padMesh);
-
-    const padRing = new THREE.Mesh(
-      new THREE.RingGeometry(7.0, 7.8, 48),
-      new THREE.MeshBasicMaterial({ color: 0xfacc15, side: THREE.DoubleSide })
-    );
-    padRing.position.z = 0.2;
-    heliGroup.add(padRing);
-
-    const hMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
-    const hStem1 = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 5.4), hMat);
-    hStem1.position.set(-1.8, 0, 0.22);
-    heliGroup.add(hStem1);
-    const hStem2 = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 5.4), hMat);
-    hStem2.position.set(1.8, 0, 0.22);
-    heliGroup.add(hStem2);
-    const hCross = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 1.0), hMat);
-    hCross.position.set(0, 0, 0.22);
-    heliGroup.add(hCross);
-
-    for (let a = 0; a < Math.PI * 2; a += Math.PI / 6) {
-      const lx = Math.cos(a) * 7.9;
-      const ly = Math.sin(a) * 7.9;
-      const led = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.12, 0.12, 0.15, 8),
-        new THREE.MeshBasicMaterial({ color: 0xfacc15 })
-      );
-      led.position.set(lx, ly, 0.25);
-      led.rotation.x = Math.PI / 2;
-      heliGroup.add(led);
+    // 6B. Upper-Right Terrace Parking Lot (6 parked cars)
+    for (let i = 0; i < 6; i++) {
+      const px = 50 + i * 2.9;
+      const py = 32;
+      const clr = carPalette[(i * 2) % carPalette.length];
+      carGroup.add(createCar(px, py, 2.6, Math.PI * 0.5, clr));
     }
 
-    group.add(heliGroup);
-
-    // 6. Communications Lattice Tower (-26, -16, 14.2)
-    const towerGroup = new THREE.Group();
-    towerGroup.position.set(-26, -16, 0);
-
-    const legMat = getPbrMat({ color: 0x94a3b8, roughness: 0.35, metalness: 0.8 }, 'medium');
-    const legPoints = [
-      [-1.5, -1.5], [1.5, -1.5], [1.5, 1.5], [-1.5, 1.5]
+    // 6C. Cars on the Roadway (Capturing drone survey realism)
+    const roadCars = [
+      { x: 38, y: -34, rot: 0.2, clr: 0x991b1b },
+      { x: 12, y: -27, rot: 0.05, clr: 0xf8fafc },
+      { x: -18, y: -23, rot: -0.15, clr: 0x334155 },
+      { x: -38, y: -8, rot: 1.2, clr: 0xcfd8dc },
+      { x: -44, y: 16, rot: 1.57, clr: 0xf8fafc }
     ];
-    legPoints.forEach(([lx, ly]) => {
-      const legGeom = new THREE.CylinderGeometry(0.08, 0.14, 28, 8);
-      const leg = new THREE.Mesh(legGeom, legMat);
-      leg.position.set(lx * 0.6, ly * 0.6, 14);
-      leg.rotation.x = Math.PI / 2;
-      leg.castShadow = true;
-      towerGroup.add(leg);
+    roadCars.forEach(rc => {
+      carGroup.add(createCar(rc.x, rc.y, 0.25, rc.rot, rc.clr));
     });
 
-    for (let tz = 3.5; tz <= 26; tz += 3.5) {
-      const s = 1.0 - (tz / 35);
-      const ringGeom = new THREE.BoxGeometry(3.0 * s, 3.0 * s, 0.15);
-      const ringMesh = new THREE.Mesh(ringGeom, legMat);
-      ringMesh.position.set(0, 0, tz);
-      towerGroup.add(ringMesh);
-    }
+    group.add(carGroup);
 
-    const platform = new THREE.Mesh(
-      new THREE.BoxGeometry(3.6, 3.6, 0.2),
-      getPbrMat({ color: 0x475569, roughness: 0.5, metalness: 0.7 }, 'medium')
-    );
-    platform.position.set(0, 0, 18);
-    towerGroup.add(platform);
+    // 7. Dense Photogrammetric Vegetation (45+ Trees & Foliage Groves)
+    const treeGroup = new THREE.Group();
+    const trunkMat = getPbrMat({ color: 0x4a3628, roughness: 0.9, metalness: 0.05 }, 'high');
+    const leafMat1 = getPbrMat({ color: 0x2b4724, roughness: 0.75, metalness: 0.05 }, 'high');
+    const leafMat2 = getPbrMat({ color: 0x385a2d, roughness: 0.75, metalness: 0.05 }, 'high');
+    const leafMat3 = getPbrMat({ color: 0x1f381c, roughness: 0.75, metalness: 0.05 }, 'high');
+    const leafMats = [leafMat1, leafMat2, leafMat3];
 
-    const dish1 = new THREE.Mesh(
-      new THREE.SphereGeometry(1.8, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2.2),
-      getPbrMat({ color: 0xf8fafc, roughness: 0.3, metalness: 0.2 }, 'medium')
-    );
-    dish1.position.set(0, -1.6, 21.5);
-    dish1.rotation.x = Math.PI / 2.3;
-    dish1.castShadow = true;
-    towerGroup.add(dish1);
+    const treeLocations = [
+      // Top-Left Parking perimeter grove (from reference!)
+      [-46, 20, 0.4], [-46, 28, 0.4], [-46, 36, 0.4], [-44, 44, 0.4],
+      [-38, 46, 0.4], [-30, 46, 0.4], [-22, 46, 0.4], [-14, 46, 0.4],
+      [-10, 38, 0.4], [-10, 28, 0.4], [-12, 20, 0.4],
+      // Roadside avenue trees along curving road
+      [48, -42, 0.3], [34, -38, 0.3], [18, -32, 0.3], [2, -28, 0.3],
+      [-14, -26, 0.3], [-28, -25, 0.3], [-40, -18, 0.3], [-46, -2, 0.3],
+      [-48, 12, 0.3], [-48, 24, 0.3],
+      // Courtyard garden trees (nestled in building bend)
+      [6, 2, 0.4], [10, 3, 0.4], [12, -2, 0.4], [6, -3, 0.4],
+      // Plaza & Terrace walkway trees
+      [28, -8, 0.5], [32, 4, 1.2], [30, 16, 2.0], [28, 28, 2.4],
+      [36, 34, 2.4], [48, 38, 2.4], [62, 28, 2.4], [62, 14, 2.4],
+      // Modern building & canopy garden trees
+      [-22, -10, 0.3], [-24, -4, 0.3], [-42, -28, 0.3], [-32, -28, 0.3]
+    ];
 
-    const dish2 = new THREE.Mesh(
-      new THREE.SphereGeometry(1.2, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2.2),
-      getPbrMat({ color: 0xf8fafc, roughness: 0.3, metalness: 0.2 }, 'medium')
-    );
-    dish2.position.set(1.4, 0, 16);
-    dish2.rotation.y = -Math.PI / 2.5;
-    dish2.castShadow = true;
-    towerGroup.add(dish2);
+    treeLocations.forEach(([tx, ty, tz], idx) => {
+      const tSub = new THREE.Group();
+      tSub.position.set(tx, ty, tz);
+      const scale = 0.85 + (idx % 5) * 0.12;
+      tSub.scale.set(scale, scale, scale);
+      tSub.rotation.z = (idx * 1.45) % (Math.PI * 2);
 
-    const beaconMat = new THREE.MeshBasicMaterial({ 
-      color: 0xef4444, 
-      transparent: true, 
-      opacity: 0.9 
+      // Tree trunk
+      const trunkH = 2.8 + (idx % 3) * 0.4;
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.5, trunkH, 8), trunkMat);
+      trunk.position.set(0, 0, trunkH / 2);
+      trunk.rotation.x = Math.PI / 2;
+      trunk.castShadow = true;
+      tSub.add(trunk);
+
+      // Multi-tiered organic foliage canopy
+      const cMat = leafMats[idx % leafMats.length];
+      const canopyH = 3.2 + (idx % 4) * 0.4;
+      const canopy = new THREE.Mesh(new THREE.DodecahedronGeometry(canopyH, 1), cMat);
+      canopy.position.set(0, 0, trunkH + canopyH * 0.7);
+      canopy.scale.set(1.1, 1.0, 0.85);
+      canopy.castShadow = true;
+      canopy.receiveShadow = true;
+      tSub.add(canopy);
+
+      // Secondary lobe for natural foliage irregularity
+      const lobe = new THREE.Mesh(new THREE.DodecahedronGeometry(canopyH * 0.7, 1), leafMats[(idx + 1) % 3]);
+      lobe.position.set(canopyH * 0.35, -canopyH * 0.2, trunkH + canopyH * 0.85);
+      lobe.castShadow = true;
+      tSub.add(lobe);
+
+      treeGroup.add(tSub);
     });
-    beaconMatRef.current = beaconMat;
-    const beaconMesh = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 16), beaconMat);
-    beaconMesh.position.set(0, 0, 28.5);
-    towerGroup.add(beaconMesh);
 
-    group.add(towerGroup);
+    group.add(treeGroup);
 
-    // 7. Geodetic Ground Control Points (GCP-01, GCP-02, GCP-03)
+    // 8. Geodetic Ground Control Points (GCP-01, GCP-02, GCP-03)
     const gcpCoords = [
-      { name: 'GCP-01', x: -28, y: 24, z: 1.2 },
-      { name: 'GCP-02', x: 30, y: 26, z: 1.6 },
-      { name: 'GCP-03', x: 28, y: -24, z: 0.8 }
+      { name: 'GCP-01', x: -32, y: 38, z: 0.8 },
+      { name: 'GCP-02', x: 54, y: 32, z: 2.7 },
+      { name: 'GCP-03', x: 38, y: -36, z: 0.7 }
     ];
     gcpCoords.forEach(gcp => {
       const gcpGroup = new THREE.Group();
       gcpGroup.position.set(gcp.x, gcp.y, gcp.z);
 
       const pad = new THREE.Mesh(
-        new THREE.PlaneGeometry(2.2, 2.2),
+        new THREE.PlaneGeometry(2.4, 2.4),
         new THREE.MeshBasicMaterial({ map: textures.gcp, side: THREE.DoubleSide })
       );
       gcpGroup.add(pad);
@@ -1317,97 +1732,31 @@ export default function ModelViewer3D({
       pole.rotation.x = Math.PI / 2;
       gcpGroup.add(pole);
 
-      const prism = new THREE.Mesh(
-        new THREE.OctahedronGeometry(0.28),
-        new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.1, metalness: 0.9 })
-      );
-      prism.position.set(0, 0, 2.45);
-      gcpGroup.add(prism);
-
       group.add(gcpGroup);
     });
-
-    // 8. Instanced Realistic Vegetation
-    const treeGroup = new THREE.Group();
-    const trunkMat = getPbrMat({ color: 0x4a3728, roughness: 0.9, metalness: 0.05 }, 'high');
-    const pineMat1 = getPbrMat({ color: 0x1e3a1e, roughness: 0.75, metalness: 0.05 }, 'high');
-    const pineMat2 = getPbrMat({ color: 0x2d4a2d, roughness: 0.75, metalness: 0.05 }, 'high');
-    const decMat = getPbrMat({ color: 0x3b5e28, roughness: 0.7, metalness: 0.05 }, 'high');
-
-    const treeLocations = [
-      [-46, -12, 1.1], [-48, 6, 1.3], [-44, 22, 1.8], [-42, -28, 0.9],
-      [-30, 44, 2.2], [-14, 46, 2.0], [8, 48, 2.4], [24, 44, 2.1], [40, 38, 1.8],
-      [48, 14, 1.5], [46, -8, 1.2], [42, -26, 0.9], [34, -40, 0.8],
-      [14, -44, 0.7], [-12, -42, 0.8], [-32, -40, 1.0],
-      [28, -6, 0.6], [32, 2, 0.7], [30, 12, 0.8]
-    ];
-
-    treeLocations.forEach(([tx, ty, tz], idx) => {
-      const isPine = idx % 2 === 0;
-      const tGroup = new THREE.Group();
-      tGroup.position.set(tx, ty, tz);
-      const scale = 0.85 + (idx % 5) * 0.1;
-      tGroup.scale.set(scale, scale, scale);
-      tGroup.rotation.z = (idx * 1.37) % (Math.PI * 2);
-
-      if (isPine) {
-        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.45, 3.2, 8), trunkMat);
-        trunk.position.set(0, 0, 1.6);
-        trunk.rotation.x = Math.PI / 2;
-        trunk.castShadow = true;
-        tGroup.add(trunk);
-
-        [
-          { r: 2.6, h: 3.2, z: 3.8, mat: pineMat1 },
-          { r: 2.1, h: 2.8, z: 5.6, mat: pineMat2 },
-          { r: 1.4, h: 2.4, z: 7.2, mat: pineMat1 }
-        ].forEach(tier => {
-          const cone = new THREE.Mesh(new THREE.ConeGeometry(tier.r, tier.h, 7), tier.mat);
-          cone.position.set(0, 0, tier.z);
-          cone.rotation.x = -Math.PI / 2;
-          cone.castShadow = true;
-          cone.receiveShadow = true;
-          tGroup.add(cone);
-        });
-      } else {
-        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.55, 3.0, 8), trunkMat);
-        trunk.position.set(0, 0, 1.5);
-        trunk.rotation.x = Math.PI / 2;
-        trunk.castShadow = true;
-        tGroup.add(trunk);
-
-        const canopy = new THREE.Mesh(new THREE.DodecahedronGeometry(2.6, 1), decMat);
-        canopy.position.set(0, 0, 4.6);
-        canopy.scale.set(1.1, 1.0, 0.85);
-        canopy.castShadow = true;
-        canopy.receiveShadow = true;
-        tGroup.add(canopy);
-      }
-      treeGroup.add(tGroup);
-    });
-    group.add(treeGroup);
 
     // 9. UAV Survey Flight Path Trajectory & Camera Frustums
     if (layers.frustums) {
       const flightGroup = new THREE.Group();
       const flightPts = [];
-      const altitude = 32.0;
+      const altitude = 36.0;
       const flightGrid = [
-        [-34, -28], [-34, 28],
-        [-18, 28], [-18, -28],
-        [-2, -28], [-2, 28],
-        [14, 28], [14, -28],
-        [30, -28], [30, 28]
+        [-42, -34], [-42, 34],
+        [-22, 34], [-22, -34],
+        [-2, -34], [-2, 34],
+        [18, 34], [18, -34],
+        [38, -34], [38, 34],
+        [58, 34], [58, -34]
       ];
 
       flightGrid.forEach(([fx, fy], idx) => {
         const pt = new THREE.Vector3(fx, fy, altitude);
         flightPts.push(pt);
 
-        const pyrGeo = new THREE.ConeGeometry(2.4, 4.2, 4);
-        const pyrMat = new THREE.MeshBasicMaterial({ 
-          color: idx === 0 ? 0x10b981 : 0x0284c7, 
-          wireframe: true 
+        const pyrGeo = new THREE.ConeGeometry(2.2, 3.8, 4);
+        const pyrMat = new THREE.MeshBasicMaterial({
+          color: idx === 0 ? 0x10b981 : 0x0284c7,
+          wireframe: true
         });
         const pyr = new THREE.Mesh(pyrGeo, pyrMat);
         pyr.position.copy(pt);
@@ -1418,23 +1767,16 @@ export default function ModelViewer3D({
           pt,
           new THREE.Vector3(fx, fy, 0.5)
         ]);
-        const rayMat = new THREE.LineDashedMaterial({ 
-          color: 0x38bdf8, 
-          dashSize: 1.0, 
-          gapSize: 0.6,
+        const rayMat = new THREE.LineDashedMaterial({
+          color: 0x38bdf8,
+          dashSize: 1.2,
+          gapSize: 0.8,
           transparent: true,
-          opacity: 0.4
+          opacity: 0.35
         });
         const rayLine = new THREE.Line(rayGeo, rayMat);
         rayLine.computeLineDistances();
         flightGroup.add(rayLine);
-
-        const dot = new THREE.Mesh(
-          new THREE.SphereGeometry(0.45, 12, 12),
-          new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
-        );
-        dot.position.copy(pt);
-        flightGroup.add(dot);
       });
 
       const pathGeo = new THREE.BufferGeometry().setFromPoints(flightPts);
@@ -1445,80 +1787,102 @@ export default function ModelViewer3D({
       group.add(flightGroup);
     }
 
-    // 10. Dense Photogrammetric Survey Point Cloud
+    // 10. Dense Photogrammetric Survey Point Cloud (~20,000 Points)
     const pGeo = new THREE.BufferGeometry();
     const pPositions = [];
     const pColors = [];
 
-    // Dense terrain points
-    for (let x = -60; x <= 60; x += 1.4) {
-      for (let y = -60; y <= 60; y += 1.4) {
-        let z = Math.sin(x * 0.045) * Math.cos(y * 0.045) * 4.2 + 
-                Math.sin(x * 0.11 + y * 0.08) * 1.6 + 
-                Math.cos(x * 0.03 - y * 0.05) * 1.2;
-        const distFromCenter = Math.sqrt(x * x + y * y);
-        if (distFromCenter < 38) {
-          const blend = Math.max(0, (distFromCenter - 22) / 16);
-          z = z * blend + 0.28 * (1 - blend);
-        }
-        pPositions.push(x, y, z + 0.14);
+    // 10A. Terrain Surface Points
+    for (let x = -64; x <= 64; x += 1.6) {
+      for (let y = -64; y <= 64; y += 1.6) {
+        let z = 0.2;
+        if (x > 26 && x < 66 && y > -4 && y < 38) z = 2.4;
+        pPositions.push(x, y, z + 0.08);
 
         if (isConfOverlay) {
           pColors.push(0.06, 0.72, 0.5);
         } else {
-          if (Math.abs(x) < 32 && Math.abs(y) < 30) {
-            pColors.push(0.58, 0.62, 0.66);
+          // Roads (dark asphalt)
+          if ((y < -20 && y > -38) || (x < -32 && y > -24 && y < 40)) {
+            if (Math.abs(y - (-28)) < 0.6) {
+              pColors.push(0.95, 0.8, 0.1); // yellow centerline
+            } else {
+              pColors.push(0.2, 0.22, 0.25); // dark asphalt
+            }
+          } else if (x > 26 && x < 66 && y > -4 && y < 38) {
+            pColors.push(0.78, 0.82, 0.85); // terrace paving
           } else {
-            const normH = Math.max(0, Math.min(1, (z + 4) / 10));
-            pColors.push(0.24 + normH * 0.12, 0.38 + normH * 0.16, 0.18 + normH * 0.08);
+            pColors.push(0.24, 0.38, 0.18); // turf green
           }
         }
       }
     }
 
-    // Dense points on Main Hangar
-    for (let rx = -22; rx <= 6; rx += 0.8) {
-      for (let ry = -5; ry <= 17; ry += 0.8) {
-        const roofZ = 9.3 + 3.6 * (1 - Math.abs(rx + 8) / 14);
-        pPositions.push(rx, ry, roofZ + 0.1);
-        pColors.push(0.25, 0.30, 0.38);
+    // 10B. Main Tower Points (Terracotta brick & green roof)
+    for (let tx = -11; tx <= 7; tx += 0.8) {
+      for (let ty = -1; ty <= 21; ty += 0.8) {
+        pPositions.push(tx, ty, 30.5);
+        pColors.push(0.28, 0.42, 0.32); // weathered sage green roof
       }
     }
-    for (let z = 0.5; z <= 9.0; z += 0.9) {
-      for (let rx = -22; rx <= 6; rx += 0.8) {
-        pPositions.push(rx, -5, z); pColors.push(0.38, 0.45, 0.52);
-        pPositions.push(rx, 17, z); pColors.push(0.38, 0.45, 0.52);
+    for (let tz = 1.0; tz <= 30.0; tz += 1.1) {
+      for (let tx = -11; tx <= 7; tx += 0.9) {
+        pPositions.push(tx, -1, tz); pColors.push(0.62, 0.31, 0.24); // brick red
+        pPositions.push(tx, 21, tz); pColors.push(0.62, 0.31, 0.24);
       }
-      for (let ry = -5; ry <= 17; ry += 0.8) {
-        pPositions.push(-22, ry, z); pColors.push(0.38, 0.45, 0.52);
-        pPositions.push(6, ry, z); pColors.push(0.38, 0.45, 0.52);
+      for (let ty = -1; ty <= 21; ty += 0.9) {
+        pPositions.push(-11, ty, tz); pColors.push(0.62, 0.31, 0.24);
+        pPositions.push(7, ty, tz); pColors.push(0.62, 0.31, 0.24);
       }
     }
 
-    // Annex Building Points
-    for (let ax = 10; ax <= 26; ax += 0.8) {
-      for (let ay = -3; ay <= 11; ay += 0.8) {
-        pPositions.push(ax, ay, 11.5);
-        pColors.push(0.72, 0.76, 0.80);
+    // 10C. East Wing Points
+    for (let ex = 3; ex <= 47; ex += 0.9) {
+      for (let ey = 0.5; ey <= 13.5; ey += 0.9) {
+        pPositions.push(ex, ey, 14.5);
+        pColors.push(0.28, 0.42, 0.32); // green roof
       }
     }
-    for (let z = 0.5; z <= 11.0; z += 0.9) {
-      for (let ax = 10; ax <= 26; ax += 0.8) {
-        pPositions.push(ax, -3, z); pColors.push(0.65, 0.70, 0.75);
-        pPositions.push(ax, 11, z); pColors.push(0.65, 0.70, 0.75);
+    for (let ez = 1.0; ez <= 14.0; ez += 1.2) {
+      for (let ex = 3; ex <= 47; ex += 1.0) {
+        pPositions.push(ex, 0.5, ez); pColors.push(0.62, 0.31, 0.24);
+        pPositions.push(ex, 13.5, ez); pColors.push(0.62, 0.31, 0.24);
       }
-      for (let ay = -3; ay <= 11; ay += 0.8) {
-        pPositions.push(10, ay, z); pColors.push(0.65, 0.70, 0.75);
-        pPositions.push(26, ay, z); pColors.push(0.65, 0.70, 0.75);
+      for (let ey = 0.5; ey <= 13.5; ey += 1.0) {
+        pPositions.push(47, ey, ez); pColors.push(0.62, 0.31, 0.24);
       }
     }
+
+    // 10D. Modern Building & Curved Canopy Points
+    for (let cy = -22; cy <= -6; cy += 1.0) {
+      for (let a = 0; a < Math.PI; a += 0.2) {
+        const cx = -32 + Math.cos(a) * 8.0;
+        const cz = Math.sin(a) * 8.0;
+        pPositions.push(cx, cy, cz);
+        pColors.push(0.95, 0.96, 0.98); // white canopy ribs
+      }
+    }
+
+    // 10E. Dense Tree Foliage Points
+    treeLocations.forEach(([tx, ty, tz]) => {
+      for (let i = 0; i < 70; i++) {
+        const rad = 1.8 + Math.random() * 2.4;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.random() * Math.PI;
+        const px = tx + rad * Math.sin(phi) * Math.cos(theta);
+        const py = ty + rad * Math.sin(phi) * Math.sin(theta);
+        const pz = tz + 3.2 + rad * Math.cos(phi);
+        pPositions.push(px, py, pz);
+        pColors.push(0.16 + Math.random() * 0.08, 0.40 + Math.random() * 0.12, 0.14 + Math.random() * 0.06);
+      }
+    });
 
     pGeo.setAttribute('position', new THREE.Float32BufferAttribute(pPositions, 3));
     pGeo.setAttribute('color', new THREE.Float32BufferAttribute(pColors, 3));
     originalColorsRef.current = new Float32Array(pColors);
 
-    const pMat = new THREE.PointsMaterial({ 
-      size: pointSize || 0.42, 
+    const pMat = new THREE.PointsMaterial({
+      size: pointSize || 0.42,
       vertexColors: true,
       sizeAttenuation: true
     });
@@ -1530,8 +1894,8 @@ export default function ModelViewer3D({
 
     sceneRef.current.add(group);
     meshObjRef.current = group;
-    setTriangleCount(96 * 96 * 2 + 620);
-    setBoundingBox({ width: '130.0', length: '130.0', height: '36.0' });
+    setTriangleCount(100 * 100 * 2 + 1850);
+    setBoundingBox({ width: '140.0', length: '140.0', height: '44.5' });
     setLoading(false);
   };
 
@@ -1934,10 +2298,10 @@ export default function ModelViewer3D({
 
   // Reset Camera View
   const resetCamera = () => {
-    lookAtTargetRef.current.set(0, 0, 0);
+    lookAtTargetRef.current.set(2, 6, 8);
     if (cameraRef.current) {
-      cameraRef.current.position.set(0, -42, 52);
-      cameraRef.current.lookAt(0, 0, 0);
+      cameraRef.current.position.set(-18, -42, 34);
+      cameraRef.current.lookAt(lookAtTargetRef.current);
     }
   };
 
