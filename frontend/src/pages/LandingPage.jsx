@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { 
   Plane, 
   Layers, 
@@ -21,7 +21,14 @@ import {
   Clock,
   ExternalLink,
   ChevronRight,
-  Database
+  Database,
+  Play,
+  Pause,
+  Volume2,
+  VolumeX,
+  Ruler,
+  Maximize2,
+  Mouse
 } from 'lucide-react';
 import { apiClient } from '../api/client';
 import StatusBadge from '../components/StatusBadge';
@@ -32,6 +39,27 @@ export default function LandingPage({ setActivePage, setActiveMissionId, setActi
   const [searchQuery, setSearchQuery] = useState('');
   const [hardware, setHardware] = useState(null);
   const [sysStatus, setSysStatus] = useState(null);
+
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [isMuted, setIsMuted] = useState(true);
+  const videoRef = useRef(null);
+
+  const togglePlay = () => {
+    if (!videoRef.current) return;
+    if (videoRef.current.paused) {
+      videoRef.current.play();
+      setIsPlaying(true);
+    } else {
+      videoRef.current.pause();
+      setIsPlaying(false);
+    }
+  };
+
+  const toggleMute = () => {
+    if (!videoRef.current) return;
+    videoRef.current.muted = !videoRef.current.muted;
+    setIsMuted(videoRef.current.muted);
+  };
 
   useEffect(() => {
     // 1. Fetch Missions
@@ -97,363 +125,651 @@ export default function LandingPage({ setActivePage, setActiveMissionId, setActi
 
       <div style={{ maxWidth: '1360px', margin: '0 auto', padding: '36px 24px 60px 24px', position: 'relative', zIndex: 2 }}>
         
-        {/* ── 1. HERO SECTION & 3D PHOTOGRAMMETRIC CENTERPIECE ────────────────── */}
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'minmax(420px, 1.15fr) minmax(460px, 1fr)', 
-          gap: '32px', 
-          alignItems: 'center',
-          marginBottom: '40px' 
+        {/* ── 1. HERO SECTION WITH FULL VIDEO BACKGROUND (MATCHING USER REFERENCE) ── */}
+        <div style={{
+          position: 'relative',
+          borderRadius: '24px',
+          overflow: 'hidden',
+          marginBottom: '44px',
+          boxShadow: '0 20px 50px rgba(15, 23, 42, 0.12)',
+          border: '1px solid rgba(226, 232, 240, 0.8)',
+          background: '#0a1426',
+          minHeight: '620px'
         }}>
-          
-          {/* Left Hero Content */}
-          <div>
-            {/* Top Professional Badge */}
-            <div style={{ 
-              display: 'inline-flex', 
-              alignItems: 'center', 
-              gap: '8px', 
-              padding: '6px 14px', 
-              borderRadius: '20px', 
-              background: 'rgba(2, 132, 199, 0.08)', 
-              border: '1px solid rgba(2, 132, 199, 0.22)', 
-              marginBottom: '20px' 
-            }}>
-              <Compass size={15} color="#0284c7" />
-              <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0369a1', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                UAV PHOTOGRAMMETRY & DIGITAL TWIN WORKSTATION
-              </span>
-            </div>
+          {/* Full-Bleed Video Background - Crystal Clear and Bright */}
+          <video
+            ref={videoRef}
+            src="/drone_survey_hero.mp4"
+            autoPlay
+            loop
+            muted
+            playsInline
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              objectPosition: 'center 22%',
+              zIndex: 0,
+              pointerEvents: 'none',
+              filter: 'none',
+              opacity: 1
+            }}
+          />
 
-            {/* Main Heading */}
-            <h1 style={{ 
-              fontSize: '2.9rem', 
-              fontWeight: 800, 
-              letterSpacing: '-0.035em', 
-              lineHeight: 1.14, 
-              marginBottom: '18px', 
-              color: '#0f172a' 
-            }}>
-              Single-Pass 3D <br />
-              <span style={{ 
-                background: 'linear-gradient(135deg, #0284c7 0%, #0d9488 100%)', 
-                WebkitBackgroundClip: 'text', 
-                WebkitTextFillColor: 'transparent' 
-              }}>
-                Digital Twin Platform
-              </span>
-            </h1>
+          {/* Subtle localized gradient behind the LEFT text area only - completely transparent across center and right */}
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'linear-gradient(90deg, rgba(255, 255, 255, 0.65) 0%, rgba(255, 255, 255, 0.42) 24%, rgba(255, 255, 255, 0.10) 42%, transparent 58%)',
+            zIndex: 1,
+            pointerEvents: 'none'
+          }} />
 
-            {/* Supporting Text */}
-            <p style={{ 
-              fontSize: '1.02rem', 
-              color: '#475569', 
-              lineHeight: 1.62, 
-              marginBottom: '28px',
-              maxWidth: '560px'
-            }}>
-              Automated photogrammetry and computer vision pipeline transforming
-              drone survey video and telemetry into georeferenced 3D point clouds,
-              surface meshes and evidence-based confidence maps.
-            </p>
-
-            {/* CTA Buttons - EXACT SAME HANDLERS PRESERVED */}
-            <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', marginBottom: '28px' }}>
-              <button 
-                onClick={() => setActivePage('create-mission')}
-                className="geo-btn-primary"
-              >
-                <Plane size={16} /> New Survey Mission
-              </button>
-              <button 
-                onClick={() => setActivePage('dashboard')}
-                className="geo-btn-secondary"
-              >
-                <Activity size={16} color="#0284c7" /> Pipeline Monitor
-              </button>
-            </div>
-
-            {/* Micro Telemetry Strip */}
-            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center', paddingTop: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', color: '#64748b' }}>
-                <CheckCircle2 size={15} color="#059669" />
-                <span style={{ fontWeight: 600, color: '#334155' }}>WGS84 & ENU Datum</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', color: '#64748b' }}>
-                <CheckCircle2 size={15} color="#059669" />
-                <span style={{ fontWeight: 600, color: '#334155' }}>CE90 / LE90 Certified</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', color: '#64748b' }}>
-                <CheckCircle2 size={15} color="#059669" />
-                <span style={{ fontWeight: 600, color: '#334155' }}>Zero Geometry Hallucination</span>
-              </div>
-            </div>
+          {/* Discrete Video Sound & Playback Controls in top-right corner */}
+          <div style={{
+            position: 'absolute',
+            top: '16px',
+            right: '20px',
+            zIndex: 4,
+            display: 'flex',
+            gap: '6px',
+            alignItems: 'center',
+            background: 'rgba(15, 23, 42, 0.65)',
+            padding: '4px 8px',
+            borderRadius: '20px',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255, 255, 255, 0.15)'
+          }}>
+            <button
+              onClick={togglePlay}
+              title={isPlaying ? "Pause Video" : "Play Video"}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#f8fafc',
+                cursor: 'pointer',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '50%'
+              }}
+            >
+              {isPlaying ? <Pause size={12} color="#38bdf8" /> : <Play size={12} color="#38bdf8" />}
+            </button>
+            <button
+              onClick={toggleMute}
+              title={isMuted ? "Unmute Audio" : "Mute Audio"}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#f8fafc',
+                cursor: 'pointer',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '50%'
+              }}
+            >
+              {isMuted ? <VolumeX size={12} color="#94a3b8" /> : <Volume2 size={12} color="#34d399" />}
+            </button>
           </div>
 
-          {/* Right Hero Visual Centerpiece */}
-          <div style={{ position: 'relative' }}>
-            <div className="geo-card" style={{ padding: '20px', overflow: 'hidden', position: 'relative' }}>
-              
-              {/* Telemetry HUD Tag */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span className="telemetry-chip">
-                    <Crosshair size={12} color="#0284c7" /> AERIAL PHOTOGRAMMETRY
-                  </span>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#059669', background: 'rgba(16, 185, 129, 0.1)', padding: '3px 8px', borderRadius: '4px' }}>
-                    ● LIVE CALIBRATION
-                  </span>
-                </div>
-                <span className="font-mono" style={{ fontSize: '0.7rem', color: '#64748b' }}>
-                  DATUM: WGS84 / EPSG:4326
+          {/* Hero Content Grid */}
+          <div style={{
+            position: 'relative',
+            zIndex: 2,
+            display: 'grid',
+            gridTemplateColumns: 'minmax(420px, 1.05fr) minmax(500px, 1fr)',
+            gap: '36px',
+            alignItems: 'center',
+            padding: '44px 38px 36px 38px'
+          }}>
+            
+            {/* Left Hero Content */}
+            <div>
+              {/* Top Professional Badge */}
+              <div style={{ 
+                display: 'inline-flex', 
+                alignItems: 'center', 
+                gap: '8px', 
+                padding: '6px 14px', 
+                borderRadius: '20px', 
+                background: 'rgba(255, 255, 255, 0.88)', 
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(2, 132, 199, 0.25)', 
+                boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                marginBottom: '22px' 
+              }}>
+                <Compass size={15} color="#0284c7" />
+                <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0369a1', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                  UAV PHOTOGRAMMETRY & DIGITAL TWIN WORKSTATION
                 </span>
               </div>
 
-              {/* Realistic Aerial Infrastructure & 3D Site Reconstruction Visual */}
-              <div style={{ 
-                height: '270px', 
-                borderRadius: '12px', 
-                background: 'linear-gradient(145deg, #0b1528 0%, #0f243d 40%, #0d3b4c 100%)', 
-                position: 'relative', 
-                overflow: 'hidden',
-                boxShadow: 'inset 0 0 40px rgba(0,0,0,0.5)'
+              {/* Main Heading */}
+              <h1 style={{ 
+                fontSize: '3.1rem', 
+                fontWeight: 800, 
+                letterSpacing: '-0.035em', 
+                lineHeight: 1.12, 
+                marginBottom: '18px', 
+                color: '#0f172a'
               }}>
-                {/* SVG Photogrammetric Site Illustration with Wireframe, Tower Crane & Point Cloud */}
-                <svg width="100%" height="100%" viewBox="0 0 540 270" style={{ position: 'absolute', top: 0, left: 0 }}>
-                  <defs>
-                    {/* Grid Pattern */}
-                    <pattern id="site-grid" width="24" height="24" patternUnits="userSpaceOnUse">
-                      <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#0284c7" strokeWidth="0.5" strokeOpacity="0.18" />
-                    </pattern>
-                    <linearGradient id="meshGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.45" />
-                      <stop offset="100%" stopColor="#2dd4bf" stopOpacity="0.1" />
-                    </linearGradient>
-                    <linearGradient id="bldgFace" x1="0%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%" stopColor="#1e293b" stopOpacity="0.9" />
-                      <stop offset="100%" stopColor="#0f172a" stopOpacity="0.95" />
-                    </linearGradient>
-                  </defs>
-
-                  {/* Ground Terrain Grid */}
-                  <rect width="540" height="270" fill="url(#site-grid)" />
-
-                  {/* Access Road & Terrain Contours */}
-                  <path d="M 0 210 Q 140 190, 270 230 T 540 200" fill="none" stroke="#334155" strokeWidth="18" strokeOpacity="0.7" />
-                  <path d="M 0 210 Q 140 190, 270 230 T 540 200" fill="none" stroke="#38bdf8" strokeWidth="1.5" strokeDasharray="6,6" strokeOpacity="0.5" />
-
-                  {/* Topographic Contour Curves */}
-                  <path d="M 40 260 C 120 220, 200 250, 360 210 C 440 180, 480 230, 540 240" fill="none" stroke="#0284c7" strokeWidth="0.8" strokeOpacity="0.25" />
-                  <path d="M 20 180 C 100 150, 180 170, 300 140 C 400 120, 470 150, 540 130" fill="none" stroke="#0d9488" strokeWidth="0.8" strokeOpacity="0.2" />
-
-                  {/* 3D Isometric Construction Building Framework */}
-                  {/* Base / Floor 1 */}
-                  <polygon points="170,165 290,135 410,165 290,200" fill="url(#bldgFace)" stroke="#38bdf8" strokeWidth="1.2" strokeOpacity="0.6" />
-                  {/* Vertical Columns */}
-                  <line x1="170" y1="165" x2="170" y2="110" stroke="#38bdf8" strokeWidth="1.5" strokeOpacity="0.7" />
-                  <line x1="290" y1="200" x2="290" y2="145" stroke="#38bdf8" strokeWidth="1.5" strokeOpacity="0.7" />
-                  <line x1="410" y1="165" x2="410" y2="110" stroke="#38bdf8" strokeWidth="1.5" strokeOpacity="0.7" />
-                  <line x1="290" y1="135" x2="290" y2="85" stroke="#38bdf8" strokeWidth="1.2" strokeOpacity="0.4" />
-                  {/* Floor 2 Slab */}
-                  <polygon points="170,110 290,85 410,110 290,145" fill="url(#meshGrad)" stroke="#38bdf8" strokeWidth="1.2" />
-                  {/* Floor 3 / Rooftop Framework with Wireframe Cross-bracing */}
-                  <line x1="170" y1="110" x2="170" y2="65" stroke="#0284c7" strokeWidth="1.2" strokeOpacity="0.8" />
-                  <line x1="290" y1="145" x2="290" y2="100" stroke="#0284c7" strokeWidth="1.2" strokeOpacity="0.8" />
-                  <line x1="410" y1="110" x2="410" y2="65" stroke="#0284c7" strokeWidth="1.2" strokeOpacity="0.8" />
-                  <polygon points="170,65 290,45 410,65 290,100" fill="none" stroke="#2dd4bf" strokeWidth="1.5" />
-                  {/* Diagonal Wireframe Bracing */}
-                  <line x1="170" y1="110" x2="290" y2="65" stroke="#38bdf8" strokeWidth="0.7" strokeOpacity="0.35" />
-                  <line x1="290" y1="110" x2="170" y2="65" stroke="#38bdf8" strokeWidth="0.7" strokeOpacity="0.35" />
-                  <line x1="290" y1="145" x2="410" y2="100" stroke="#38bdf8" strokeWidth="0.7" strokeOpacity="0.35" />
-
-                  {/* Tower Construction Crane */}
-                  <line x1="390" y1="180" x2="390" y2="25" stroke="#f59e0b" strokeWidth="2.5" />
-                  <line x1="330" y1="30" x2="460" y2="30" stroke="#f59e0b" strokeWidth="2" />
-                  <line x1="390" y1="20" x2="390" y2="25" stroke="#fbbf24" strokeWidth="2" />
-                  <line x1="390" y1="20" x2="460" y2="30" stroke="#fbbf24" strokeWidth="1" strokeOpacity="0.6" />
-                  <line x1="390" y1="20" x2="350" y2="30" stroke="#fbbf24" strokeWidth="1" strokeOpacity="0.6" />
-                  <line x1="440" y1="30" x2="440" y2="75" stroke="#cbd5e1" strokeWidth="1" strokeDasharray="3,3" />
-                  <rect x="434" y="75" width="12" height="10" fill="#f59e0b" rx="2" />
-
-                  {/* Dense Point Cloud Scatter Particles */}
-                  {[
-                    [185, 140], [210, 155], [235, 170], [260, 185], [275, 192],
-                    [200, 100], [225, 115], [250, 130], [280, 140], [310, 125],
-                    [335, 140], [360, 155], [385, 170], [320, 95],  [345, 105],
-                    [370, 120], [395, 135], [285, 75],  [300, 80],  [270, 60],
-                    [295, 55],  [320, 60],  [345, 70],  [230, 85],  [255, 75],
-                    [155, 195], [140, 220], [165, 235], [440, 180], [465, 195],
-                    [480, 215], [120, 160], [430, 140], [450, 155], [210, 215]
-                  ].map(([px, py], i) => (
-                    <circle key={i} cx={px} cy={py} r={i % 3 === 0 ? 2 : 1.2} fill={i % 4 === 0 ? '#34d399' : '#38bdf8'} opacity="0.85" />
-                  ))}
-
-                  {/* Camera Projection Ray from UAV */}
-                  <line x1="90" y1="35" x2="290" y2="135" stroke="#06b6d4" strokeWidth="1" strokeDasharray="4,4" strokeOpacity="0.45" />
-                  <line x1="90" y1="35" x2="170" y2="165" stroke="#06b6d4" strokeWidth="0.8" strokeDasharray="4,4" strokeOpacity="0.35" />
-                  <line x1="90" y1="35" x2="410" y2="165" stroke="#06b6d4" strokeWidth="0.8" strokeDasharray="4,4" strokeOpacity="0.35" />
-
-                  {/* Drone Position Icon */}
-                  <g transform="translate(75, 20)">
-                    <circle cx="15" cy="15" r="14" fill="rgba(2, 132, 199, 0.25)" stroke="#38bdf8" strokeWidth="1" />
-                    <line x1="3" y1="15" x2="27" y2="15" stroke="#38bdf8" strokeWidth="2" />
-                    <line x1="15" y1="3" x2="15" y2="27" stroke="#38bdf8" strokeWidth="2" />
-                    <circle cx="15" cy="15" r="4" fill="#38bdf8" />
-                  </g>
-
-                  {/* Geographic Coordinate Crosshair Marker */}
-                  <g transform="translate(280, 125)">
-                    <circle cx="10" cy="10" r="12" fill="none" stroke="#2dd4bf" strokeWidth="1" strokeDasharray="3,3" />
-                    <line x1="0" y1="10" x2="20" y2="10" stroke="#2dd4bf" strokeWidth="1" />
-                    <line x1="10" y1="0" x2="10" y2="20" stroke="#2dd4bf" strokeWidth="1" />
-                  </g>
-                </svg>
-
-                {/* Live Real-time Telemetry HUD Tag (Bottom Right) */}
-                <div style={{ 
-                  position: 'absolute', 
-                  bottom: '12px', 
-                  right: '12px', 
-                  background: 'rgba(15, 23, 42, 0.88)', 
-                  border: '1px solid rgba(56, 189, 248, 0.25)', 
-                  borderRadius: '8px', 
-                  padding: '8px 12px', 
-                  backdropFilter: 'blur(8px)',
-                  display: 'flex',
-                  gap: '14px',
-                  alignItems: 'center',
-                  fontSize: '0.72rem',
-                  fontFamily: 'var(--font-mono)'
+                <span style={{ textShadow: '0 2px 12px rgba(255, 255, 255, 0.95)' }}>Single-Pass 3D</span> <br />
+                <span style={{ 
+                  background: 'linear-gradient(135deg, #0284c7 0%, #0d9488 100%)', 
+                  WebkitBackgroundClip: 'text', 
+                  WebkitTextFillColor: 'transparent',
+                  display: 'inline-block'
                 }}>
-                  <div>
-                    <span style={{ color: '#64748b', display: 'block', fontSize: '0.62rem' }}>ALTITUDE</span>
-                    <strong style={{ color: '#38bdf8' }}>{activeMission?.flight_altitude_m || 45.0}m AGL</strong>
-                  </div>
-                  <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.1)' }} />
-                  <div>
-                    <span style={{ color: '#64748b', display: 'block', fontSize: '0.62rem' }}>GSD</span>
-                    <strong style={{ color: '#34d399' }}>{activeMission?.target_gsd_cm || 1.8} cm/px</strong>
-                  </div>
-                  <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.1)' }} />
-                  <div>
-                    <span style={{ color: '#64748b', display: 'block', fontSize: '0.62rem' }}>COORDS</span>
-                    <strong style={{ color: '#f1f5f9' }}>37°46'N, 122°25'W</strong>
-                  </div>
+                  Digital Twin Platform
+                </span>
+              </h1>
+
+              {/* Supporting Text */}
+              <p style={{ 
+                fontSize: '1.02rem', 
+                color: '#0f172a', 
+                fontWeight: 500,
+                lineHeight: 1.62, 
+                marginBottom: '30px',
+                maxWidth: '520px',
+                textShadow: '0 1px 8px rgba(255, 255, 255, 0.95)'
+              }}>
+                Automated photogrammetry and computer vision pipeline transforming
+                drone survey video and telemetry into georeferenced 3D models with high accuracy.
+              </p>
+
+              {/* CTA Buttons */}
+              <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', marginBottom: '28px' }}>
+                <button 
+                  onClick={() => setActivePage('create-mission')}
+                  className="geo-btn-primary"
+                  style={{
+                    borderRadius: '30px',
+                    padding: '12px 24px',
+                    fontWeight: 700,
+                    boxShadow: '0 8px 24px rgba(2, 132, 199, 0.35)'
+                  }}
+                >
+                  <Plane size={17} /> New Survey Mission
+                </button>
+                <button 
+                  onClick={() => setActivePage('dashboard')}
+                  className="geo-btn-secondary"
+                  style={{
+                    borderRadius: '30px',
+                    padding: '12px 24px',
+                    fontWeight: 700,
+                    background: 'rgba(255, 255, 255, 0.92)',
+                    boxShadow: '0 4px 14px rgba(0,0,0,0.06)'
+                  }}
+                >
+                  <Activity size={17} color="#0284c7" /> Pipeline Monitor
+                </button>
+              </div>
+
+              {/* Micro Telemetry Strip */}
+              <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '36px' }}>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px', 
+                  fontSize: '0.78rem', 
+                  color: '#0f172a',
+                  fontWeight: 600,
+                  background: 'rgba(255, 255, 255, 0.75)',
+                  backdropFilter: 'blur(8px)',
+                  WebkitBackdropFilter: 'blur(8px)',
+                  padding: '5px 12px',
+                  borderRadius: '20px',
+                  border: '1px solid rgba(255, 255, 255, 0.7)',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+                }}>
+                  <CheckCircle2 size={16} color="#059669" />
+                  <span>WGS84 & ENU Datum</span>
+                </div>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px', 
+                  fontSize: '0.78rem', 
+                  color: '#0f172a',
+                  fontWeight: 600,
+                  background: 'rgba(255, 255, 255, 0.75)',
+                  backdropFilter: 'blur(8px)',
+                  WebkitBackdropFilter: 'blur(8px)',
+                  padding: '5px 12px',
+                  borderRadius: '20px',
+                  border: '1px solid rgba(255, 255, 255, 0.7)',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+                }}>
+                  <CheckCircle2 size={16} color="#059669" />
+                  <span>CE90 / LE90 Certified</span>
+                </div>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px', 
+                  fontSize: '0.78rem', 
+                  color: '#0f172a',
+                  fontWeight: 600,
+                  background: 'rgba(255, 255, 255, 0.75)',
+                  backdropFilter: 'blur(8px)',
+                  WebkitBackdropFilter: 'blur(8px)',
+                  padding: '5px 12px',
+                  borderRadius: '20px',
+                  border: '1px solid rgba(255, 255, 255, 0.7)',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+                }}>
+                  <CheckCircle2 size={16} color="#059669" />
+                  <span>Zero Geometry Hallucination</span>
                 </div>
               </div>
 
-              {/* ── Side Panels: Reconstruction Health & Live Pipeline ── */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.35fr', gap: '14px', marginTop: '16px' }}>
-                
-                {/* 1. Reconstruction Health (Circular Progress) */}
-                <div style={{ 
-                  background: 'rgba(240, 249, 255, 0.75)', 
-                  border: '1px solid rgba(14, 165, 233, 0.16)', 
-                  borderRadius: '12px', 
-                  padding: '12px 14px',
+              {/* Bottom Left Scroll to Explore */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '14px'
+                  gap: '8px',
+                  padding: '5px 12px',
+                  borderRadius: '20px',
+                  background: 'rgba(255, 255, 255, 0.85)',
+                  border: '1px solid rgba(203, 213, 225, 0.7)',
+                  color: '#64748b',
+                  fontSize: '0.76rem',
+                  fontWeight: 600
                 }}>
-                  {/* Circular Gauge Graphic */}
-                  <div style={{ position: 'relative', width: '56px', height: '56px', flexShrink: 0 }}>
-                    <svg width="56" height="56" viewBox="0 0 56 56">
-                      <circle cx="28" cy="28" r="23" fill="none" stroke="#e2e8f0" strokeWidth="5" />
-                      <circle 
-                        cx="28" 
-                        cy="28" 
-                        r="23" 
-                        fill="none" 
-                        stroke="#0284c7" 
-                        strokeWidth="5" 
-                        strokeDasharray={2 * Math.PI * 23}
-                        strokeDashoffset={(2 * Math.PI * 23) * (1 - (platformStats.healthPct / 100))}
-                        strokeLinecap="round"
-                        transform="rotate(-90 28 28)"
-                      />
-                    </svg>
-                    <div style={{ 
-                      position: 'absolute', 
-                      top: 0, 
-                      left: 0, 
-                      width: '100%', 
-                      height: '100%', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center',
-                      fontSize: '0.76rem',
-                      fontWeight: 800,
-                      color: '#0f172a'
-                    }}>
-                      {platformStats.healthPct}%
-                    </div>
-                  </div>
+                  <Mouse size={14} color="#0284c7" />
+                  <span>Scroll to explore</span>
+                </div>
+                <div style={{ width: '100px', height: '1px', background: 'linear-gradient(90deg, rgba(148, 163, 184, 0.5) 0%, transparent 100%)' }} />
+              </div>
+            </div>
 
-                  <div>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      RECONSTRUCTION HEALTH
+            {/* Right Hero Visual Centerpiece: Floating Aerial Photogrammetry Workstation Card */}
+            <div style={{ position: 'relative' }}>
+              <div style={{ 
+                background: 'rgba(255, 255, 255, 0.76)', 
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
+                borderRadius: '22px', 
+                padding: '20px', 
+                border: '1px solid rgba(255, 255, 255, 0.65)',
+                boxShadow: '0 24px 60px rgba(15, 23, 42, 0.16)'
+              }}>
+                {/* Telemetry HUD Top Bar */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span className="telemetry-chip">
+                      <Crosshair size={12} color="#0284c7" /> AERIAL PHOTOGRAMMETRY
                     </span>
-                    <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
-                      Survey Reliability
-                    </h4>
-                    <p style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '1px' }}>
-                      {platformStats.active > 0 ? `${platformStats.active} jobs converging` : 'Nominal pipeline health'}
-                    </p>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#059669', background: 'rgba(16, 185, 129, 0.1)', padding: '3px 8px', borderRadius: '4px' }}>
+                      ● LIVE CALIBRATION
+                    </span>
                   </div>
+                  <span className="font-mono" style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                    DATUM: WGS84 / EPSG:4326
+                  </span>
                 </div>
 
-                {/* 2. Live Pipeline Stage Sequence */}
+                {/* 3D Blueprint CAD Viewport */}
                 <div style={{ 
-                  background: 'rgba(240, 249, 255, 0.75)', 
-                  border: '1px solid rgba(14, 165, 233, 0.16)', 
-                  borderRadius: '12px', 
-                  padding: '12px 14px' 
+                  height: '280px', 
+                  borderRadius: '14px', 
+                  background: 'linear-gradient(135deg, #091322 0%, #0c182c 100%)', 
+                  position: 'relative', 
+                  overflow: 'hidden',
+                  boxShadow: '0 12px 32px rgba(15, 23, 42, 0.2), inset 0 0 40px rgba(0,0,0,0.6)',
+                  border: '1px solid rgba(56, 189, 248, 0.28)'
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      LIVE PIPELINE WORKFLOW
-                    </span>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#059669' }}>
-                      ● ACTIVE ENGINE
-                    </span>
+                  {/* Top-left target crosshair */}
+                  <div style={{ position: 'absolute', top: '12px', left: '12px', zIndex: 3, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Crosshair size={18} color="rgba(56, 189, 248, 0.7)" />
                   </div>
-                  
-                  {/* Timeline Stage Indicators */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+
+                  {/* Right-edge CAD tool buttons */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '12px',
+                    right: '12px',
+                    zIndex: 3,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px'
+                  }}>
                     {[
-                      { name: "Ingest", active: true },
-                      { name: "Quality", active: true },
-                      { name: "Masking", active: true },
-                      { name: "Tracking", active: true },
-                      { name: "SfM Sparse", active: true },
-                      { name: "Dense MVS", active: true },
-                      { name: "Mesh 3D", active: true },
-                      { name: "Confidence", active: true }
-                    ].map((stg, i) => (
-                      <div 
-                        key={i}
-                        style={{ 
-                          background: '#ffffff', 
-                          border: '1px solid rgba(14, 165, 233, 0.22)', 
-                          borderRadius: '6px', 
-                          padding: '4px 6px',
-                          textAlign: 'center'
+                      { icon: Box, label: '3D Box' },
+                      { icon: Layers, label: 'Layers' },
+                      { icon: Ruler, label: 'Measure' },
+                      { icon: Maximize2, label: 'Expand' }
+                    ].map((btn, idx) => (
+                      <div
+                        key={idx}
+                        title={btn.label}
+                        style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '6px',
+                          background: 'rgba(15, 23, 42, 0.75)',
+                          border: '1px solid rgba(56, 189, 248, 0.25)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#94a3b8',
+                          cursor: 'pointer'
                         }}
                       >
-                        <span style={{ fontSize: '0.64rem', fontWeight: 600, color: '#0f172a', display: 'block' }}>
-                          {stg.name}
-                        </span>
-                        <div style={{ width: '100%', height: '2px', background: '#0284c7', borderRadius: '1px', marginTop: '3px' }} />
+                        <btn.icon size={13} color="#38bdf8" />
                       </div>
                     ))}
                   </div>
+
+                  {/* 3D Isometric SVG Blueprint: Multi-story Building & Yellow Tower Crane */}
+                  <svg 
+                    width="100%" 
+                    height="100%" 
+                    viewBox="0 0 460 280" 
+                    preserveAspectRatio="xMidYMid slice"
+                    style={{ position: 'absolute', inset: 0, zIndex: 1 }}
+                  >
+                    <defs>
+                      <pattern id="isoGrid" width="28" height="28" patternUnits="userSpaceOnUse">
+                        <path d="M 28 0 L 0 28 M 0 0 L 28 28" fill="none" stroke="rgba(56, 189, 248, 0.08)" strokeWidth="0.8" />
+                      </pattern>
+                    </defs>
+
+                    {/* Background Isometric Grid */}
+                    <rect width="100%" height="100%" fill="url(#isoGrid)" />
+
+                    {/* Ground Reference Plane */}
+                    <polygon 
+                      points="230,250 380,185 230,125 80,185" 
+                      fill="rgba(2, 132, 199, 0.04)" 
+                      stroke="rgba(56, 189, 248, 0.25)" 
+                      strokeWidth="1.2" 
+                      strokeDasharray="4 3" 
+                    />
+
+                    {/* 3D Bounding Box Guides */}
+                    <line x1="80" y1="185" x2="80" y2="75" stroke="rgba(56, 189, 248, 0.3)" strokeDasharray="3 3" />
+                    <line x1="380" y1="185" x2="380" y2="75" stroke="rgba(56, 189, 248, 0.3)" strokeDasharray="3 3" />
+                    <line x1="230" y1="250" x2="230" y2="140" stroke="rgba(56, 189, 248, 0.3)" strokeDasharray="3 3" />
+                    <polygon points="230,140 380,75 230,15 80,75" fill="none" stroke="rgba(56, 189, 248, 0.3)" strokeDasharray="3 3" />
+
+                    {/* Multi-story Construction Frame (Level 0, 1, 2, 3, Roof) */}
+                    {/* Floor 0 (Base) */}
+                    <polygon points="230,230 350,175 230,120 110,175" fill="rgba(14, 165, 233, 0.08)" stroke="#38bdf8" strokeWidth="1.2" />
+
+                    {/* Floor 1 */}
+                    <polygon points="230,205 350,150 230,95 110,150" fill="rgba(14, 165, 233, 0.06)" stroke="#38bdf8" strokeWidth="1.2" />
+                    {/* Floor 2 */}
+                    <polygon points="230,180 350,125 230,70 110,125" fill="rgba(14, 165, 233, 0.06)" stroke="#38bdf8" strokeWidth="1.2" />
+                    {/* Floor 3 (Roof Slab) */}
+                    <polygon points="230,155 350,100 230,45 110,100" fill="rgba(14, 165, 233, 0.12)" stroke="#22d3ee" strokeWidth="1.5" />
+
+                    {/* Vertical Columns */}
+                    <line x1="110" y1="175" x2="110" y2="100" stroke="#38bdf8" strokeWidth="1.5" />
+                    <line x1="230" y1="230" x2="230" y2="155" stroke="#38bdf8" strokeWidth="1.8" />
+                    <line x1="350" y1="175" x2="350" y2="100" stroke="#38bdf8" strokeWidth="1.5" />
+                    <line x1="230" y1="120" x2="230" y2="45" stroke="rgba(56, 189, 248, 0.4)" strokeWidth="1" strokeDasharray="3 2" />
+
+                    {/* Intermediate Columns */}
+                    <line x1="170" y1="202" x2="170" y2="128" stroke="#38bdf8" strokeWidth="1.2" />
+                    <line x1="290" y1="202" x2="290" y2="128" stroke="#38bdf8" strokeWidth="1.2" />
+                    <line x1="170" y1="148" x2="170" y2="72" stroke="rgba(56, 189, 248, 0.4)" strokeWidth="0.8" strokeDasharray="2 2" />
+                    <line x1="290" y1="148" x2="290" y2="72" stroke="rgba(56, 189, 248, 0.4)" strokeWidth="0.8" strokeDasharray="2 2" />
+
+                    {/* Interior Cross Bracing (X-trusses) */}
+                    <line x1="110" y1="175" x2="170" y2="128" stroke="rgba(56, 189, 248, 0.35)" strokeWidth="0.8" />
+                    <line x1="170" y1="202" x2="110" y2="150" stroke="rgba(56, 189, 248, 0.35)" strokeWidth="0.8" />
+                    <line x1="170" y1="128" x2="230" y2="155" stroke="rgba(56, 189, 248, 0.35)" strokeWidth="0.8" />
+                    <line x1="230" y1="205" x2="170" y2="150" stroke="rgba(56, 189, 248, 0.35)" strokeWidth="0.8" />
+                    <line x1="230" y1="230" x2="290" y2="128" stroke="rgba(56, 189, 248, 0.35)" strokeWidth="0.8" />
+                    <line x1="290" y1="202" x2="230" y2="180" stroke="rgba(56, 189, 248, 0.35)" strokeWidth="0.8" />
+                    <line x1="290" y1="128" x2="350" y2="175" stroke="rgba(56, 189, 248, 0.35)" strokeWidth="0.8" />
+                    <line x1="350" y1="150" x2="290" y2="150" stroke="rgba(56, 189, 248, 0.35)" strokeWidth="0.8" />
+
+                    {/* Yellow Tower Crane on Roof */}
+                    <line x1="270" y1="72" x2="270" y2="18" stroke="#fbbf24" strokeWidth="2.5" />
+                    <line x1="267" y1="72" x2="273" y2="72" stroke="#f59e0b" strokeWidth="1.2" />
+                    <line x1="267" y1="54" x2="273" y2="54" stroke="#f59e0b" strokeWidth="1.2" />
+                    <line x1="267" y1="36" x2="273" y2="36" stroke="#f59e0b" strokeWidth="1.2" />
+                    <line x1="267" y1="18" x2="273" y2="18" stroke="#f59e0b" strokeWidth="1.2" />
+                    <line x1="267" y1="72" x2="273" y2="54" stroke="#f59e0b" strokeWidth="0.9" />
+                    <line x1="267" y1="54" x2="273" y2="36" stroke="#f59e0b" strokeWidth="0.9" />
+                    <line x1="267" y1="36" x2="273" y2="18" stroke="#f59e0b" strokeWidth="0.9" />
+
+                    {/* Operator Cabin */}
+                    <rect x="264" y="16" width="10" height="8" rx="1" fill="#f59e0b" stroke="#d97706" strokeWidth="0.8" />
+
+                    {/* Crane Tower Peak / A-frame */}
+                    <polygon points="270,6 266,16 274,16" fill="#fbbf24" stroke="#d97706" strokeWidth="0.8" />
+
+                    {/* Horizontal Jib / Boom extending right */}
+                    <line x1="230" y1="16" x2="385" y2="16" stroke="#fbbf24" strokeWidth="2" />
+                    <line x1="230" y1="16" x2="270" y2="16" stroke="#fbbf24" strokeWidth="2" />
+                    <rect x="220" y="13" width="14" height="7" rx="1" fill="#78350f" stroke="#fbbf24" strokeWidth="0.8" />
+
+                    {/* Jib Tie Cable from apex */}
+                    <line x1="270" y1="6" x2="360" y2="16" stroke="#fde68a" strokeWidth="0.9" strokeDasharray="2 1" />
+                    <line x1="270" y1="6" x2="225" y2="16" stroke="#fde68a" strokeWidth="0.9" strokeDasharray="2 1" />
+
+                    {/* Hoist Trolley & Cable line descending down */}
+                    <rect x="332" y="14" width="6" height="4" fill="#fbbf24" />
+                    <line x1="335" y1="18" x2="335" y2="60" stroke="#fef08a" strokeWidth="1" strokeDasharray="2 2" />
+                    <polygon points="332,60 338,60 335,64" fill="#f59e0b" />
+
+                    {/* Point Cloud Sparkle Particles around the site */}
+                    {[
+                      { cx: 120, cy: 110, r: 1.5 },
+                      { cx: 145, cy: 95, r: 1.2 },
+                      { cx: 180, cy: 80, r: 1.8 },
+                      { cx: 215, cy: 65, r: 1.3 },
+                      { cx: 250, cy: 85, r: 1.6 },
+                      { cx: 285, cy: 110, r: 1.4 },
+                      { cx: 320, cy: 95, r: 1.5 },
+                      { cx: 340, cy: 130, r: 1.2 },
+                      { cx: 160, cy: 160, r: 1.5 },
+                      { cx: 220, cy: 175, r: 1.8 },
+                      { cx: 270, cy: 165, r: 1.3 },
+                      { cx: 310, cy: 145, r: 1.6 },
+                      { cx: 130, cy: 140, r: 1.4 },
+                      { cx: 195, cy: 135, r: 1.2 },
+                      { cx: 240, cy: 210, r: 1.5 },
+                      { cx: 260, cy: 195, r: 1.7 },
+                      { cx: 180, cy: 185, r: 1.3 },
+                      { cx: 300, cy: 180, r: 1.4 }
+                    ].map((pt, i) => (
+                      <circle key={i} cx={pt.cx} cy={pt.cy} r={pt.r} fill="#67e8f9" opacity="0.85" />
+                    ))}
+                  </svg>
+
+                  {/* 4-column telemetry bar inside bottom of viewport */}
+                  <div style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    zIndex: 3,
+                    background: 'rgba(9, 19, 34, 0.92)',
+                    backdropFilter: 'blur(8px)',
+                    borderTop: '1px solid rgba(56, 189, 248, 0.2)',
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(4, 1fr)',
+                    padding: '8px 14px',
+                    textAlign: 'center',
+                    fontFamily: 'var(--font-mono)'
+                  }}>
+                    <div>
+                      <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.62rem', letterSpacing: '0.04em' }}>ALTITUDE</span>
+                      <strong style={{ color: '#38bdf8', fontSize: '0.8rem' }}>45m AGL</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.62rem', letterSpacing: '0.04em' }}>GSD</span>
+                      <strong style={{ color: '#34d399', fontSize: '0.8rem' }}>1.8 cm/px</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.62rem', letterSpacing: '0.04em' }}>COORDS</span>
+                      <strong style={{ color: '#f1f5f9', fontSize: '0.78rem' }}>37°46'N, 122°25'W</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.62rem', letterSpacing: '0.04em' }}>OVERLAP</span>
+                      <strong style={{ color: '#38bdf8', fontSize: '0.8rem' }}>80%</strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Section: Reconstruction Health & Live Pipeline Workflow */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.35fr', gap: '14px', marginTop: '16px' }}>
+                  {/* Reconstruction Health */}
+                  <div style={{ 
+                    background: 'rgba(255, 255, 255, 0.65)', 
+                    backdropFilter: 'blur(8px)',
+                    WebkitBackdropFilter: 'blur(8px)',
+                    border: '1px solid rgba(255, 255, 255, 0.75)', 
+                    borderRadius: '12px', 
+                    padding: '12px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '14px'
+                  }}>
+                    <div style={{ position: 'relative', width: '54px', height: '54px', flexShrink: 0 }}>
+                      <svg width="54" height="54" viewBox="0 0 54 54">
+                        <circle cx="27" cy="27" r="22" fill="none" stroke="#e2e8f0" strokeWidth="5" />
+                        <circle 
+                          cx="27" 
+                          cy="27" 
+                          r="22" 
+                          fill="none" 
+                          stroke="#0284c7" 
+                          strokeWidth="5" 
+                          strokeDasharray={2 * Math.PI * 22}
+                          strokeDashoffset={0}
+                          strokeLinecap="round"
+                          transform="rotate(-90 27 27)"
+                        />
+                      </svg>
+                      <div style={{ 
+                        position: 'absolute', 
+                        top: 0, 
+                        left: 0, 
+                        width: '100%', 
+                        height: '100%', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        fontSize: '0.78rem',
+                        fontWeight: 800,
+                        color: '#0f172a'
+                      }}>
+                        100%
+                      </div>
+                    </div>
+
+                    <div>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        RECONSTRUCTION HEALTH
+                      </span>
+                      <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
+                        Survey Reliability
+                      </h4>
+                      <p style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '1px' }}>
+                        Nominal pipeline health
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Live Pipeline Workflow */}
+                  <div style={{ 
+                    background: 'rgba(255, 255, 255, 0.65)', 
+                    backdropFilter: 'blur(8px)',
+                    WebkitBackdropFilter: 'blur(8px)',
+                    border: '1px solid rgba(255, 255, 255, 0.75)', 
+                    borderRadius: '12px', 
+                    padding: '12px 14px' 
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        LIVE PIPELINE WORKFLOW
+                      </span>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#059669' }}>
+                        ● ACTIVE ENGINE
+                      </span>
+                    </div>
+
+                    {/* Stepper with 2 rows of 4 stages */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {/* Row 1 */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
+                        <div style={{ position: 'absolute', top: '7px', left: '10px', right: '10px', height: '2px', background: '#38bdf8', zIndex: 0 }} />
+                        {[
+                          { name: 'Ingest', status: 'done' },
+                          { name: 'Quality', status: 'done' },
+                          { name: 'Masking', status: 'done' },
+                          { name: 'Tracking', status: 'active' }
+                        ].map((s, idx) => (
+                          <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1 }}>
+                            <div style={{
+                              width: '16px',
+                              height: '16px',
+                              borderRadius: '50%',
+                              background: s.status === 'done' ? '#0284c7' : '#ffffff',
+                              border: s.status === 'active' ? '3px solid #0284c7' : '2px solid #0284c7',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '0.55rem',
+                              color: '#fff',
+                              fontWeight: 700
+                            }}>
+                              {s.status === 'done' && '✓'}
+                            </div>
+                            <span style={{ fontSize: '0.62rem', fontWeight: 600, color: s.status === 'active' ? '#0284c7' : '#334155', marginTop: '3px' }}>
+                              {s.name}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Row 2 */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
+                        <div style={{ position: 'absolute', top: '7px', left: '10px', right: '10px', height: '2px', background: '#e2e8f0', zIndex: 0 }} />
+                        {[
+                          { name: 'SfM Sparse', status: 'pending' },
+                          { name: 'Dense MVS', status: 'pending' },
+                          { name: 'Mesh 3D', status: 'pending' },
+                          { name: 'Confidence', status: 'pending' }
+                        ].map((s, idx) => (
+                          <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1 }}>
+                            <div style={{
+                              width: '16px',
+                              height: '16px',
+                              borderRadius: '50%',
+                              background: '#ffffff',
+                              border: '2px solid #cbd5e1',
+                              boxSizing: 'border-box'
+                            }} />
+                            <span style={{ fontSize: '0.62rem', fontWeight: 500, color: '#64748b', marginTop: '3px' }}>
+                              {s.name}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
               </div>
-
             </div>
-          </div>
 
+          </div>
         </div>
 
         {/* ── 2. FEATURE & CAPABILITY SECTION (4 ARCHITECTURE PILLARS) ──────── */}

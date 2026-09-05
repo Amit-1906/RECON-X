@@ -12,7 +12,14 @@ Verifies:
      confidence_atlas.png, and confidence_report.json.
 """
 import json
+import sys
 from pathlib import Path
+
+# Ensure project root is on sys.path so 'backend' is resolved in IDE and direct runs
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 import numpy as np
 import pytest
 import trimesh
@@ -199,3 +206,7 @@ def test_end_to_end_confidence_stage(tmp_path, synthetic_mesh_and_cameras):
     mesh = list(tm.geometry.values())[0] if isinstance(tm, trimesh.Scene) else tm
     assert len(mesh.vertices) == len(box.vertices), "Geometry vertex count must be preserved"
     assert mesh.visual.vertex_colors is not None, "Confidence GLB must contain vertex color attributes"
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

@@ -1,41 +1,38 @@
 /**
  * Phase 1 — Video Ingestion & Frame Extraction Page
  *
- * 4-panel progressive flow:
- *   1. Mission selector + drag-and-drop video dropzone
- *   2. Video Info panel  — FPS, resolution, duration, codec (from backend probe)
- *   3. Extraction Controls — interval slider, estimated frame count, Extract button
- *   4. Live Progress panel — status badge, animated progress bar, frame count, error display
+ * Light Geospatial Photogrammetry Workstation Design
+ * Preserves 100% of existing functionality, state, API calls, and validation.
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Upload, Video, FileText, CheckCircle2, AlertCircle,
   Play, Cpu, ArrowRight, Film, Clock, Layers, Zap,
   BarChart2, RefreshCw, AlertTriangle, ChevronRight,
-  Grid, Info,
+  Grid, Info, Navigation, Sliders, ChevronDown
 } from 'lucide-react';
 import { apiClient } from '../api/client';
 
 // ── Status helpers ────────────────────────────────────────────────────────────
 
 const STATUS_META = {
-  UPLOADED:   { color: '#38bdf8', bg: 'rgba(56,189,248,0.12)',  label: 'Uploaded',   icon: CheckCircle2 },
-  VALIDATING: { color: '#fbbf24', bg: 'rgba(251,191,36,0.12)',  label: 'Validating', icon: RefreshCw },
-  EXTRACTING: { color: '#a78bfa', bg: 'rgba(167,139,250,0.12)', label: 'Extracting', icon: Layers },
-  COMPLETED:  { color: '#34d399', bg: 'rgba(52,211,153,0.12)',  label: 'Completed',  icon: CheckCircle2 },
-  FAILED:     { color: '#f87171', bg: 'rgba(248,113,113,0.12)', label: 'Failed',     icon: AlertTriangle },
+  UPLOADED:   { color: '#0284c7', bg: 'rgba(2, 132, 199, 0.08)',  label: 'Uploaded',   icon: CheckCircle2 },
+  VALIDATING: { color: '#d97706', bg: 'rgba(217, 119, 6, 0.08)',  label: 'Validating', icon: RefreshCw },
+  EXTRACTING: { color: '#7c3aed', bg: 'rgba(124, 58, 237, 0.08)', label: 'Extracting', icon: Layers },
+  COMPLETED:  { color: '#059669', bg: 'rgba(5, 150, 105, 0.08)',  label: 'Completed',  icon: CheckCircle2 },
+  FAILED:     { color: '#e11d48', bg: 'rgba(225, 29, 72, 0.08)',   label: 'Failed',     icon: AlertTriangle },
 };
 
 function StatusBadge({ status }) {
   if (!status) return null;
-  const meta = STATUS_META[status] || { color: '#94a3b8', bg: 'rgba(148,163,184,0.12)', label: status, icon: Info };
+  const meta = STATUS_META[status] || { color: '#64748b', bg: 'rgba(100, 116, 139, 0.08)', label: status, icon: Info };
   const Icon = meta.icon;
   const isSpinning = status === 'VALIDATING' || status === 'EXTRACTING';
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: '6px',
       padding: '5px 12px', borderRadius: '999px',
-      background: meta.bg, border: `1px solid ${meta.color}22`,
+      background: meta.bg, border: `1px solid ${meta.color}33`,
       color: meta.color, fontSize: '0.78rem', fontWeight: 700,
       letterSpacing: '0.04em',
     }}>
@@ -66,22 +63,27 @@ function fmtDuration(sec) {
 
 // ── Stat card helper ──────────────────────────────────────────────────────────
 
-function StatCard({ icon: Icon, label, value, color = '#38bdf8' }) {
+function StatCard({ icon: Icon, label, value, color = '#0284c7' }) {
   return (
     <div style={{
-      background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
-      borderRadius: '10px', padding: '14px 16px',
-      display: 'flex', alignItems: 'center', gap: '12px',
+      background: '#ffffff',
+      border: '1px solid rgba(14, 165, 233, 0.16)',
+      borderRadius: '12px',
+      padding: '14px 16px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)'
     }}>
       <div style={{
         width: 38, height: 38, borderRadius: '9px',
-        background: `${color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+        background: `${color}14`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
       }}>
         <Icon size={18} color={color} />
       </div>
       <div>
-        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '2px' }}>{label}</div>
-        <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#e2e8f0' }}>{value}</div>
+        <div style={{ fontSize: '0.72rem', color: '#64748b', marginBottom: '2px', fontWeight: 600 }}>{label}</div>
+        <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0f172a' }}>{value}</div>
       </div>
     </div>
   );
@@ -89,21 +91,21 @@ function StatCard({ icon: Icon, label, value, color = '#38bdf8' }) {
 
 // ── Progress bar ──────────────────────────────────────────────────────────────
 
-function ProgressBar({ value, max, color = '#a78bfa' }) {
+function ProgressBar({ value, max, color = '#7c3aed' }) {
   const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.8rem' }}>
-        <span style={{ color: 'var(--text-muted)' }}>Frames extracted</span>
+        <span style={{ color: '#64748b', fontWeight: 600 }}>Frames extracted</span>
         <span style={{ color, fontWeight: 700 }}>{value.toLocaleString()} / {max > 0 ? max.toLocaleString() : '?'} ({pct}%)</span>
       </div>
-      <div style={{ height: '8px', background: 'rgba(255,255,255,0.07)', borderRadius: '999px', overflow: 'hidden' }}>
+      <div style={{ height: '8px', background: 'rgba(226, 232, 240, 0.8)', borderRadius: '999px', overflow: 'hidden' }}>
         <div style={{
           height: '100%', width: `${pct}%`,
-          background: `linear-gradient(90deg, ${color}, #38bdf8)`,
+          background: `linear-gradient(90deg, ${color}, #0284c7)`,
           borderRadius: '999px',
           transition: 'width 0.4s ease',
-          boxShadow: `0 0 12px ${color}55`,
+          boxShadow: `0 0 10px ${color}44`,
         }} />
       </div>
     </div>
@@ -162,7 +164,7 @@ export default function VideoUploadPage({
           if (list[0].ingestion_status) setIngestionStatus(list[0].ingestion_status);
         }
       })
-      .catch((err) => setError(err.message));
+      .catch((err) => setError(err.message || 'Failed to fetch missions'));
   }, [activeMissionId]);
 
   // ── Polling ─────────────────────────────────────────────────────────────────
@@ -289,389 +291,525 @@ export default function VideoUploadPage({
   const isTerminal = ingestionStatus === 'COMPLETED' || ingestionStatus === 'FAILED';
   const isExtracting = ingestionStatus === 'EXTRACTING';
 
-  // ── Styles ──────────────────────────────────────────────────────────────────
-
-  const panelStyle = {
-    background: 'rgba(255,255,255,0.025)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: '14px',
-    padding: '24px',
-    marginBottom: '20px',
-  };
-
-  // ── Render ──────────────────────────────────────────────────────────────────
-
   return (
-    <div style={{ maxWidth: '960px', margin: '0 auto', padding: '40px 24px' }}>
+    <div className="geospatial-canvas" style={{ minHeight: '100vh', position: 'relative', overflowX: 'hidden' }}>
+      {/* Topographic Contour Line Overlay Background */}
+      <div className="topographic-overlay" />
 
-      {/* ── Header ── */}
-      <div style={{ marginBottom: '32px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-          <Film size={28} color="#38bdf8" />
-          <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#fff', margin: 0 }}>
-            Video Ingestion &amp; Frame Extraction
-          </h1>
-        </div>
-        <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', margin: 0 }}>
-          Phase 1 — Upload your drone footage, inspect video metadata, and extract keyframes at a configurable interval.
-        </p>
-      </div>
-
-      {/* ── Global error ── */}
-      {error && (
+      <div style={{ maxWidth: '1080px', margin: '0 auto', padding: '32px 24px 64px 24px', position: 'relative', zIndex: 2 }}>
+        
+        {/* ── HERO SECTION ───────────────────────────────────────────────────── */}
         <div style={{
-          background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)',
-          borderRadius: '10px', padding: '12px 16px', color: '#fca5a5',
-          marginBottom: '20px', display: 'flex', alignItems: 'flex-start', gap: '10px',
-          fontSize: '0.875rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '24px',
+          marginBottom: '32px',
+          paddingBottom: '24px',
+          borderBottom: '1px solid rgba(14, 165, 233, 0.16)'
         }}>
-          <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
-          <span>{error}</span>
+          {/* Left Title & Subtitle */}
+          <div style={{ maxWidth: '640px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <span className="telemetry-chip">
+                PHASE 1 OF 7
+              </span>
+              <span className="telemetry-chip" style={{ color: '#0d9488', borderColor: 'rgba(13, 148, 136, 0.25)', background: 'rgba(13, 148, 136, 0.08)' }}>
+                UAV INGESTION ENGINE
+              </span>
+            </div>
+
+            <h1 style={{
+              fontSize: '2.35rem',
+              fontWeight: 800,
+              color: '#0f172a',
+              letterSpacing: '-0.025em',
+              lineHeight: 1.18,
+              margin: 0
+            }}>
+              Video Ingestion &amp; <span style={{ color: '#0284c7' }}>Frame Extraction</span>
+            </h1>
+
+            <p style={{ fontSize: '0.94rem', color: '#64748b', marginTop: '8px', lineHeight: 1.5, margin: '8px 0 0 0' }}>
+              Phase 1 — Upload your drone footage, inspect video metadata, and extract keyframes at a configurable interval.
+            </p>
+          </div>
+
+          {/* Right Header: Decorative Surveying UAV + Digital Terrain Mesh */}
+          <div style={{
+            position: 'relative',
+            width: '340px',
+            height: '130px',
+            borderRadius: '16px',
+            overflow: 'hidden',
+            background: 'linear-gradient(135deg, rgba(255,255,255,0.7) 0%, rgba(224,242,254,0.5) 100%)',
+            border: '1px solid rgba(14, 165, 233, 0.2)',
+            boxShadow: '0 4px 18px rgba(2, 132, 199, 0.08)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <img 
+              src="/uav_survey_hero.jpg" 
+              alt="UAV Photogrammetry Surveying" 
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                opacity: 0.94,
+                mixBlendMode: 'multiply'
+              }}
+            />
+            {/* GPS Location & Telemetry Badge */}
+            <div style={{
+              position: 'absolute',
+              bottom: '8px',
+              left: '10px',
+              background: 'rgba(255, 255, 255, 0.92)',
+              backdropFilter: 'blur(8px)',
+              padding: '3px 9px',
+              borderRadius: '6px',
+              border: '1px solid rgba(14, 165, 233, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981' }} />
+              <span style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', fontWeight: 600, color: '#0369a1' }}>
+                GPS FIX · 4K TELEMETRY READY
+              </span>
+            </div>
+          </div>
         </div>
-      )}
 
-      {/* ── Panel 1: Mission + Dropzone ── */}
-      <div style={panelStyle}>
-        <h2 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff', marginBottom: '16px' }}>
-          1 · Select Mission &amp; Upload Flight Video
-        </h2>
-
-        {/* Mission selector */}
-        <div style={{ marginBottom: '20px' }}>
-          <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
-            Target Mission
-          </label>
-          <select
-            value={selectedMission?.id || ''}
-            onChange={handleMissionChange}
-            className="form-select"
-            style={{ width: '100%', maxWidth: '480px' }}
-          >
-            {missions.length === 0 && <option value="">No missions — create one first</option>}
-            {missions.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name} · {m.drone_model} · {m.flight_altitude_m}m
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Drag & drop dropzone */}
-        <input
-          ref={videoInputRef}
-          type="file"
-          accept=".mp4,.mov,.avi,.mkv,.webm,.ts,.mts"
-          style={{ display: 'none' }}
-          onChange={handleFileInput}
-        />
-
-        <div
-          onClick={handleDropzoneClick}
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={handleDrop}
-          style={{
-            border: dragOver
-              ? '2px dashed #38bdf8'
-              : hasVideo
-                ? '1px solid rgba(52,211,153,0.5)'
-                : '2px dashed rgba(255,255,255,0.12)',
+        {/* ── ERROR MESSAGE ALERT ────────────────────────────────────────────── */}
+        {error && (
+          <div style={{
+            background: '#fff5f5',
+            border: '1px solid rgba(244, 63, 94, 0.3)',
             borderRadius: '12px',
-            padding: '32px',
-            textAlign: 'center',
-            cursor: 'pointer',
-            background: dragOver
-              ? 'rgba(56,189,248,0.06)'
-              : hasVideo
-                ? 'rgba(52,211,153,0.04)'
-                : 'rgba(255,255,255,0.015)',
-            transition: 'all 0.2s',
-          }}
-        >
-          {uploadPhase === 'uploading' ? (
+            padding: '14px 18px',
+            color: '#b91c1c',
+            marginBottom: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            boxShadow: '0 2px 8px rgba(244, 63, 94, 0.05)'
+          }}>
+            <AlertTriangle size={18} color="#e11d48" style={{ flexShrink: 0 }} />
+            <span style={{ fontSize: '0.88rem', fontWeight: 500 }}>{error}</span>
+          </div>
+        )}
+
+        {/* ── ONE MAIN CARD: SELECT MISSION & UPLOAD FLIGHT VIDEO ──────────── */}
+        <div className="geo-card" style={{ padding: '32px 36px', marginBottom: '28px' }}>
+          
+          {/* Card Header */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '24px' }}>
+            <div className="uav-section-num">01</div>
             <div>
-              <RefreshCw size={36} color="#a78bfa" style={{ animation: 'spin 1s linear infinite', marginBottom: '12px' }} />
-              <p style={{ color: '#e2e8f0', fontWeight: 600, marginBottom: '8px' }}>
-                Uploading &amp; probing video…
-              </p>
-              {/* Upload progress bar */}
-              <div style={{ width: '100%', maxWidth: '360px', margin: '0 auto' }}>
-                <div style={{ height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '999px', overflow: 'hidden' }}>
-                  <div style={{
-                    height: '100%',
-                    width: `${uploadProgress}%`,
-                    background: 'linear-gradient(90deg, #a78bfa, #38bdf8)',
-                    borderRadius: '999px',
-                    transition: 'width 0.2s',
-                  }} />
-                </div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '6px' }}>
-                  {uploadProgress}% transferred
-                </div>
-              </div>
-            </div>
-          ) : hasVideo ? (
-            <div>
-              <CheckCircle2 size={36} color="#34d399" style={{ marginBottom: '10px' }} />
-              <p style={{ color: '#34d399', fontWeight: 700, fontSize: '1rem', marginBottom: '4px' }}>
-                {selectedMission?.video_filename || 'Video attached'}
-              </p>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                Click to replace with a different video file
+              <h2 style={{
+                fontSize: '1.25rem',
+                fontWeight: 700,
+                color: '#0f172a',
+                letterSpacing: '-0.01em',
+                margin: 0
+              }}>
+                Select Mission &amp; Upload Flight Video
+              </h2>
+              <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '3px', margin: '3px 0 0 0' }}>
+                Choose the target survey mission and ingest the raw aerial footage for frame extraction.
               </p>
             </div>
-          ) : (
-            <div>
-              <Upload size={36} color="#38bdf8" style={{ marginBottom: '12px', opacity: 0.7 }} />
-              <p style={{ color: '#e2e8f0', fontWeight: 600, fontSize: '1rem', marginBottom: '4px' }}>
-                Drag &amp; drop your drone flight video here
-              </p>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                MP4, MOV, AVI, MKV, WEBM, TS, MTS · up to 4K resolution
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── Panel 2: Video Info (shown after probe) ── */}
-      {hasProbeData && (
-        <div style={panelStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h2 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff', margin: 0 }}>
-              2 · Video Information
-            </h2>
-            <StatusBadge status={ingestionStatus} />
           </div>
 
-          {/* Local video preview */}
-          {localVideoUrl && (
-            <div style={{ marginBottom: '20px', borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <video
-                src={localVideoUrl}
-                controls
-                style={{ width: '100%', maxHeight: '320px', display: 'block', background: '#000' }}
-              />
-            </div>
-          )}
-
-          {/* Probe stats grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '12px' }}>
-            <StatCard icon={Zap}     label="Frame Rate"     value={fmt(selectedMission?.video_fps, 'FPS')}         color="#fbbf24" />
-            <StatCard icon={Grid}    label="Resolution"
-              value={selectedMission?.video_width && selectedMission?.video_height
-                ? `${selectedMission.video_width} × ${selectedMission.video_height}`
-                : '—'}
-              color="#38bdf8"
-            />
-            <StatCard icon={Clock}    label="Duration"       value={fmtDuration(selectedMission?.video_duration_seconds)} color="#34d399" />
-            <StatCard icon={Film}     label="Total Frames"   value={fmt(selectedMission?.video_total_frames)}      color="#a78bfa" />
-            <StatCard icon={BarChart2} label="File Size"     value={fmtBytes(selectedMission?.video_size_bytes)}   color="#f472b6" />
-            <StatCard icon={Info}     label="Codec"          value={selectedMission?.video_codec || '—'}           color="#94a3b8" />
-          </div>
-        </div>
-      )}
-
-      {/* ── Panel 3: Extraction Controls ── */}
-      {hasVideo && !isTerminal && (
-        <div style={panelStyle}>
-          <h2 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff', marginBottom: '18px' }}>
-            3 · Configure Frame Extraction
-          </h2>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
-            {/* Interval slider */}
-            <div>
-              <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '8px' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Extraction Interval</span>
-                <span style={{ color: '#a78bfa', fontWeight: 700 }}>{intervalSec.toFixed(1)}s</span>
-              </label>
-              <input
-                type="range"
-                min="0.1" max="5.0" step="0.1"
-                value={intervalSec}
-                onChange={(e) => setIntervalSec(parseFloat(e.target.value))}
-                style={{ width: '100%', accentColor: '#a78bfa' }}
-              />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '4px' }}>
-                <span>0.1s (dense)</span><span>5.0s (sparse)</span>
-              </div>
-            </div>
-
-            {/* Max dimension */}
-            <div>
-              <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '8px' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Max Frame Dimension</span>
-                <span style={{ color: '#38bdf8', fontWeight: 700 }}>{maxDimension === 0 ? 'No resize' : `${maxDimension}px`}</span>
-              </label>
-              <input
-                type="range"
-                min="0" max="4096" step="64"
-                value={maxDimension}
-                onChange={(e) => setMaxDimension(parseInt(e.target.value))}
-                style={{ width: '100%', accentColor: '#38bdf8' }}
-              />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '4px' }}>
-                <span>0 (no resize)</span><span>4096px</span>
-              </div>
-            </div>
-
-            {/* JPEG quality */}
-            <div>
-              <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '8px' }}>
-                <span style={{ color: 'var(--text-muted)' }}>JPEG Quality</span>
-                <span style={{ color: '#34d399', fontWeight: 700 }}>{jpegQuality}%</span>
-              </label>
-              <input
-                type="range"
-                min="50" max="100" step="5"
-                value={jpegQuality}
-                onChange={(e) => setJpegQuality(parseInt(e.target.value))}
-                style={{ width: '100%', accentColor: '#34d399' }}
-              />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '4px' }}>
-                <span>50 (small)</span><span>100 (lossless)</span>
-              </div>
-            </div>
-
-            {/* Estimated frame count preview */}
-            <div style={{
-              background: 'rgba(167,139,250,0.07)', border: '1px solid rgba(167,139,250,0.2)',
-              borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'center',
-            }}>
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '6px' }}>Estimated Frames</div>
-              <div style={{ fontSize: '2rem', fontWeight: 800, color: '#a78bfa', lineHeight: 1 }}>
-                {estimatedFrames != null ? estimatedFrames.toLocaleString() : '—'}
-              </div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '4px' }}>
-                {selectedMission?.video_duration_seconds
-                  ? `${fmtDuration(selectedMission.video_duration_seconds)} ÷ ${intervalSec.toFixed(1)}s interval`
-                  : 'Upload video to see estimate'}
-              </div>
-            </div>
-          </div>
-
-          {/* Extract button */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button
-              onClick={handleExtract}
-              disabled={extracting || !hasVideo || uploadPhase === 'uploading'}
-              className="btn-primary"
-              style={{ padding: '12px 28px', fontSize: '0.95rem', gap: '8px', display: 'flex', alignItems: 'center' }}
-            >
-              <Layers size={17} />
-              {extracting ? 'Extracting…' : 'Extract Frames'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Panel 4: Live Progress ── */}
-      {ingestionStatus && ingestionStatus !== 'UPLOADED' && (
-        <div style={{
-          ...panelStyle,
-          border: isTerminal
-            ? ingestionStatus === 'COMPLETED'
-              ? '1px solid rgba(52,211,153,0.3)'
-              : '1px solid rgba(248,113,113,0.3)'
-            : '1px solid rgba(167,139,250,0.25)',
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h2 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff', margin: 0 }}>
-              4 · Processing Status
-            </h2>
-            <StatusBadge status={ingestionStatus} />
-          </div>
-
-          {/* Progress bar (only while extracting) */}
-          {(isExtracting || ingestionStatus === 'COMPLETED') && (
-            <div style={{ marginBottom: '20px' }}>
-              <ProgressBar
-                value={selectedMission?.extracted_frame_count || 0}
-                max={selectedMission?.estimated_frame_count || estimatedFrames || 0}
-                color={ingestionStatus === 'COMPLETED' ? '#34d399' : '#a78bfa'}
-              />
-            </div>
-          )}
-
-          {/* Status stats */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '12px', marginBottom: '16px' }}>
-            <StatCard
-              icon={Layers}
-              label="Frames Extracted"
-              value={fmt(selectedMission?.extracted_frame_count)}
-              color="#a78bfa"
-            />
-            <StatCard
-              icon={Film}
-              label="Interval Used"
-              value={fmt(selectedMission?.extraction_interval_sec, 's')}
-              color="#38bdf8"
-            />
-            <StatCard
-              icon={Grid}
-              label="Max Dimension"
-              value={selectedMission?.extraction_max_dimension === 0
-                ? 'No resize'
-                : fmt(selectedMission?.extraction_max_dimension, 'px')}
-              color="#fbbf24"
-            />
-          </div>
-
-          {/* Error detail */}
-          {ingestionStatus === 'FAILED' && selectedMission?.extraction_error && (
-            <div style={{
-              background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.25)',
-              borderRadius: '8px', padding: '12px 14px', color: '#fca5a5', fontSize: '0.82rem',
-              marginBottom: '16px',
-            }}>
-              <strong>Error:</strong> {selectedMission.extraction_error}
-            </div>
-          )}
-
-          {/* Success actions */}
-          {ingestionStatus === 'COMPLETED' && (
-            <div style={{
-              background: 'rgba(52,211,153,0.07)', border: '1px solid rgba(52,211,153,0.25)',
-              borderRadius: '10px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            }}>
-              <div>
-                <div style={{ color: '#34d399', fontWeight: 700, marginBottom: '2px' }}>
-                  ✓ {(selectedMission?.extracted_frame_count || 0).toLocaleString()} frames extracted successfully
-                </div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  Stored in: <code style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
-                    storage/frames/{selectedMission?.id?.slice(0, 8)}…/
-                  </code>
-                </div>
-              </div>
-              <button
-                onClick={() => setActivePage('dashboard')}
-                className="btn-primary"
-                style={{ padding: '10px 20px', fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+          {/* Mission Dropdown */}
+          <div style={{ marginBottom: '24px', maxWidth: '520px' }}>
+            <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '8px' }}>
+              Target Mission
+            </label>
+            <div className="uav-field-wrapper">
+              <select
+                value={selectedMission?.id || ''}
+                onChange={handleMissionChange}
+                className="uav-input"
+                style={{
+                  appearance: 'none',
+                  WebkitAppearance: 'none',
+                  paddingRight: '40px',
+                  cursor: 'pointer',
+                  fontWeight: 600
+                }}
               >
-                Pipeline Monitor <ChevronRight size={15} />
-              </button>
+                {missions.length === 0 && <option value="">No missions — create one first</option>}
+                {missions.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name} · {m.drone_model} · {m.flight_altitude_m}m
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={18} color="#0284c7" style={{ position: 'absolute', right: '14px', pointerEvents: 'none' }} />
             </div>
-          )}
+          </div>
 
-          {/* Retry on failure */}
-          {ingestionStatus === 'FAILED' && (
+          {/* Hidden file input */}
+          <input
+            ref={videoInputRef}
+            type="file"
+            accept=".mp4,.mov,.avi,.mkv,.webm,.ts,.mts"
+            style={{ display: 'none' }}
+            onChange={handleFileInput}
+          />
+
+          {/* ── DRAG & DROP UPLOAD AREA ── */}
+          <div
+            onClick={handleDropzoneClick}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleDrop}
+            style={{
+              border: dragOver
+                ? '2.5px dashed #0284c7'
+                : hasVideo
+                  ? '2px solid rgba(16, 185, 129, 0.45)'
+                  : '2px dashed rgba(2, 132, 199, 0.35)',
+              borderRadius: '16px',
+              padding: '48px 32px',
+              textAlign: 'center',
+              cursor: 'pointer',
+              background: dragOver
+                ? 'rgba(2, 132, 199, 0.08)'
+                : hasVideo
+                  ? 'rgba(16, 185, 129, 0.03)'
+                  : 'linear-gradient(180deg, rgba(240, 249, 255, 0.7) 0%, rgba(224, 242, 254, 0.35) 100%)',
+              boxShadow: dragOver
+                ? '0 0 28px rgba(2, 132, 199, 0.18)'
+                : '0 2px 8px rgba(15, 23, 42, 0.03)',
+              transition: 'all 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+          >
+            {uploadPhase === 'uploading' ? (
+              <div>
+                <RefreshCw size={44} color="#0284c7" style={{ animation: 'spin 1s linear infinite', margin: '0 auto 14px auto' }} />
+                <p style={{ color: '#0f172a', fontWeight: 700, fontSize: '1.08rem', marginBottom: '8px' }}>
+                  Uploading &amp; probing video…
+                </p>
+                {/* Upload progress bar */}
+                <div style={{ width: '100%', maxWidth: '380px', margin: '0 auto' }}>
+                  <div style={{ height: '8px', background: 'rgba(226, 232, 240, 0.8)', borderRadius: '999px', overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%',
+                      width: `${uploadProgress}%`,
+                      background: 'linear-gradient(90deg, #0284c7, #0d9488)',
+                      borderRadius: '999px',
+                      transition: 'width 0.2s',
+                    }} />
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '8px', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                    {uploadProgress}% transferred
+                  </div>
+                </div>
+              </div>
+            ) : hasVideo ? (
+              <div>
+                <div style={{
+                  width: '56px',
+                  height: '56px',
+                  borderRadius: '50%',
+                  background: 'rgba(16, 185, 129, 0.12)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 14px auto'
+                }}>
+                  <CheckCircle2 size={32} color="#059669" />
+                </div>
+                <p style={{ color: '#065f46', fontWeight: 700, fontSize: '1.1rem', marginBottom: '6px' }}>
+                  {selectedMission?.video_filename || 'Video attached'}
+                </p>
+                <p style={{ color: '#0284c7', fontSize: '0.84rem', fontWeight: 600 }}>
+                  Click to replace with a different video file
+                </p>
+              </div>
+            ) : (
+              <div>
+                <div style={{
+                  width: '64px',
+                  height: '64px',
+                  borderRadius: '50%',
+                  background: 'rgba(2, 132, 199, 0.1)',
+                  border: '1px solid rgba(2, 132, 199, 0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 16px auto',
+                  boxShadow: '0 4px 14px rgba(2, 132, 199, 0.15)'
+                }}>
+                  <Upload size={30} color="#0284c7" />
+                </div>
+                <p style={{ color: '#0f172a', fontWeight: 700, fontSize: '1.15rem', marginBottom: '6px' }}>
+                  Drag &amp; drop your drone flight video here
+                </p>
+                <p style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 500 }}>
+                  MP4, MOV, AVI, MKV, WEBM, TS, MTS • up to 4K resolution
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── PANEL 2: VIDEO INFO (SHOWN AFTER PROBE) ───────────────────────── */}
+        {hasProbeData && (
+          <div className="geo-card" style={{ padding: '28px 32px', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Film size={20} color="#0284c7" />
+                <h2 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                  Video Telemetry &amp; Codec Profile
+                </h2>
+              </div>
+              <StatusBadge status={ingestionStatus} />
+            </div>
+
+            {/* Local video preview */}
+            {localVideoUrl && (
+              <div style={{ marginBottom: '20px', borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(14, 165, 233, 0.2)', boxShadow: '0 4px 14px rgba(15, 23, 42, 0.04)' }}>
+                <video
+                  src={localVideoUrl}
+                  controls
+                  style={{ width: '100%', maxHeight: '340px', display: 'block', background: '#0f172a' }}
+                />
+              </div>
+            )}
+
+            {/* Probe stats grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '14px' }}>
+              <StatCard icon={Zap}      label="Frame Rate"     value={fmt(selectedMission?.video_fps, 'FPS')}         color="#d97706" />
+              <StatCard icon={Grid}     label="Resolution"
+                value={selectedMission?.video_width && selectedMission?.video_height
+                  ? `${selectedMission.video_width} × ${selectedMission.video_height}`
+                  : '—'}
+                color="#0284c7"
+              />
+              <StatCard icon={Clock}    label="Duration"       value={fmtDuration(selectedMission?.video_duration_seconds)} color="#059669" />
+              <StatCard icon={Film}     label="Total Frames"   value={fmt(selectedMission?.video_total_frames)}      color="#7c3aed" />
+              <StatCard icon={BarChart2} label="File Size"     value={fmtBytes(selectedMission?.video_size_bytes)}   color="#db2777" />
+              <StatCard icon={Info}     label="Codec"          value={selectedMission?.video_codec || '—'}           color="#475569" />
+            </div>
+          </div>
+        )}
+
+        {/* ── PANEL 3: EXTRACTION CONTROLS ─────────────────────────────────── */}
+        {hasVideo && !isTerminal && (
+          <div className="geo-card" style={{ padding: '28px 32px', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+              <Sliders size={20} color="#0284c7" />
+              <h2 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                Configure Frame Extraction
+              </h2>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+              {/* Interval slider */}
+              <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '10px' }}>
+                  <span>Extraction Interval</span>
+                  <span style={{ color: '#7c3aed', fontWeight: 700 }}>{intervalSec.toFixed(1)}s</span>
+                </label>
+                <input
+                  type="range"
+                  min="0.1" max="5.0" step="0.1"
+                  value={intervalSec}
+                  onChange={(e) => setIntervalSec(parseFloat(e.target.value))}
+                  style={{ width: '100%', accentColor: '#7c3aed' }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#94a3b8', marginTop: '6px' }}>
+                  <span>0.1s (dense)</span><span>5.0s (sparse)</span>
+                </div>
+              </div>
+
+              {/* Max dimension */}
+              <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '10px' }}>
+                  <span>Max Frame Dimension</span>
+                  <span style={{ color: '#0284c7', fontWeight: 700 }}>{maxDimension === 0 ? 'No resize' : `${maxDimension}px`}</span>
+                </label>
+                <input
+                  type="range"
+                  min="0" max="4096" step="64"
+                  value={maxDimension}
+                  onChange={(e) => setMaxDimension(parseInt(e.target.value))}
+                  style={{ width: '100%', accentColor: '#0284c7' }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#94a3b8', marginTop: '6px' }}>
+                  <span>0 (no resize)</span><span>4096px</span>
+                </div>
+              </div>
+
+              {/* JPEG quality */}
+              <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '10px' }}>
+                  <span>JPEG Quality</span>
+                  <span style={{ color: '#059669', fontWeight: 700 }}>{jpegQuality}%</span>
+                </label>
+                <input
+                  type="range"
+                  min="50" max="100" step="5"
+                  value={jpegQuality}
+                  onChange={(e) => setJpegQuality(parseInt(e.target.value))}
+                  style={{ width: '100%', accentColor: '#059669' }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#94a3b8', marginTop: '6px' }}>
+                  <span>50 (small)</span><span>100 (lossless)</span>
+                </div>
+              </div>
+
+              {/* Estimated frame count preview */}
+              <div style={{
+                background: 'rgba(124, 58, 237, 0.05)', border: '1px solid rgba(124, 58, 237, 0.2)',
+                borderRadius: '12px', padding: '18px', display: 'flex', flexDirection: 'column', justifyContent: 'center',
+              }}>
+                <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, marginBottom: '6px' }}>Estimated Frames</div>
+                <div style={{ fontSize: '2.2rem', fontWeight: 800, color: '#7c3aed', lineHeight: 1 }}>
+                  {estimatedFrames != null ? estimatedFrames.toLocaleString() : '—'}
+                </div>
+                <div style={{ fontSize: '0.74rem', color: '#94a3b8', marginTop: '6px' }}>
+                  {selectedMission?.video_duration_seconds
+                    ? `${fmtDuration(selectedMission.video_duration_seconds)} ÷ ${intervalSec.toFixed(1)}s interval`
+                    : 'Upload video to see estimate'}
+                </div>
+              </div>
+            </div>
+
+            {/* Extract button */}
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <button
-                onClick={() => {
-                  setIngestionStatus('UPLOADED');
-                  setError(null);
-                }}
-                className="btn-secondary"
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 20px', fontSize: '0.88rem' }}
+                onClick={handleExtract}
+                disabled={extracting || !hasVideo || uploadPhase === 'uploading'}
+                className="geo-btn-primary"
+                style={{ padding: '12px 30px', fontSize: '0.92rem' }}
               >
-                <RefreshCw size={15} /> Retry Extraction
+                <Layers size={17} />
+                <span>{extracting ? 'Extracting…' : 'Extract Frames'}</span>
               </button>
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+
+        {/* ── PANEL 4: LIVE PROCESSING PROGRESS ─────────────────────────────── */}
+        {ingestionStatus && ingestionStatus !== 'UPLOADED' && (
+          <div className="geo-card" style={{
+            padding: '28px 32px',
+            marginBottom: '24px',
+            border: isTerminal
+              ? ingestionStatus === 'COMPLETED'
+                ? '1.5px solid rgba(16, 185, 129, 0.35)'
+                : '1.5px solid rgba(244, 63, 94, 0.35)'
+              : '1.5px solid rgba(2, 132, 199, 0.35)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Cpu size={20} color="#0284c7" />
+                <h2 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                  Processing &amp; Keyframe Ingestion Pipeline
+                </h2>
+              </div>
+              <StatusBadge status={ingestionStatus} />
+            </div>
+
+            {/* Progress bar (only while extracting) */}
+            {(isExtracting || ingestionStatus === 'COMPLETED') && (
+              <div style={{ marginBottom: '22px' }}>
+                <ProgressBar
+                  value={selectedMission?.extracted_frame_count || 0}
+                  max={selectedMission?.estimated_frame_count || estimatedFrames || 0}
+                  color={ingestionStatus === 'COMPLETED' ? '#059669' : '#7c3aed'}
+                />
+              </div>
+            )}
+
+            {/* Status stats */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '14px', marginBottom: '18px' }}>
+              <StatCard
+                icon={Layers}
+                label="Frames Extracted"
+                value={fmt(selectedMission?.extracted_frame_count)}
+                color="#7c3aed"
+              />
+              <StatCard
+                icon={Film}
+                label="Interval Used"
+                value={fmt(selectedMission?.extraction_interval_sec, 's')}
+                color="#0284c7"
+              />
+              <StatCard
+                icon={Grid}
+                label="Max Dimension"
+                value={selectedMission?.extraction_max_dimension === 0
+                  ? 'No resize'
+                  : fmt(selectedMission?.extraction_max_dimension, 'px')}
+                color="#d97706"
+              />
+            </div>
+
+            {/* Error detail */}
+            {ingestionStatus === 'FAILED' && selectedMission?.extraction_error && (
+              <div style={{
+                background: '#fff5f5', border: '1px solid rgba(244, 63, 94, 0.3)',
+                borderRadius: '10px', padding: '14px 16px', color: '#b91c1c', fontSize: '0.84rem',
+                marginBottom: '18px',
+              }}>
+                <strong>Error:</strong> {selectedMission.extraction_error}
+              </div>
+            )}
+
+            {/* Success actions */}
+            {ingestionStatus === 'COMPLETED' && (
+              <div style={{
+                background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)',
+                borderRadius: '12px', padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px'
+              }}>
+                <div>
+                  <div style={{ color: '#065f46', fontWeight: 700, fontSize: '0.95rem', marginBottom: '4px' }}>
+                    ✓ {(selectedMission?.extracted_frame_count || 0).toLocaleString()} frames extracted successfully
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                    Stored in: <code style={{ color: '#0369a1', fontFamily: 'var(--font-mono)', fontSize: '0.78rem', background: '#ffffff', padding: '2px 6px', borderRadius: '4px' }}>
+                      storage/frames/{selectedMission?.id?.slice(0, 8)}…/
+                    </code>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setActivePage('dashboard')}
+                  className="geo-btn-primary"
+                  style={{ padding: '10px 22px', fontSize: '0.88rem' }}
+                >
+                  <span>Pipeline Monitor</span> <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
+
+            {/* Retry on failure */}
+            {ingestionStatus === 'FAILED' && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => {
+                    setIngestionStatus('UPLOADED');
+                    setError(null);
+                  }}
+                  className="geo-btn-secondary"
+                  style={{ padding: '10px 22px', fontSize: '0.88rem' }}
+                >
+                  <RefreshCw size={15} /> <span>Retry Extraction</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+      </div>
 
       {/* ── spin keyframe ── */}
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>

@@ -93,172 +93,203 @@ export default function AnalyticsReportPage({ activeJobId }) {
 
   if (!activeJobId) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-        <BarChart2 size={48} style={{ opacity: 0.2, margin: '0 auto 16px' }} />
-        <h2>Analytics Dashboard</h2>
-        <p>No active job selected. Please select a job from the pipeline monitor.</p>
+      <div className="geospatial-canvas" style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
+        <div className="glass-panel" style={{ padding: '48px 40px', textAlign: 'center', maxWidth: '520px', margin: '0 auto', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', boxShadow: '0 4px 20px rgba(15, 23, 42, 0.05)' }}>
+          <div style={{ width: 64, height: 64, borderRadius: '16px', background: 'rgba(2,132,199,0.08)', border: '1px solid rgba(2,132,199,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+            <BarChart2 size={32} color="#0284c7" />
+          </div>
+          <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>Photogrammetry Diagnostics</h2>
+          <p style={{ color: '#64748b', fontSize: '0.9rem', lineHeight: 1.5 }}>No active job selected. Please launch or select a reconstruction job from the pipeline monitor to inspect diagnostic reports.</p>
+        </div>
       </div>
     );
   }
 
   if (loading) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center' }}>
-        <RefreshCw size={32} className="spin" color="#38bdf8" style={{ animation: 'spin 1s linear infinite' }} />
-        <p style={{ marginTop: '16px', color: 'var(--text-muted)' }}>Loading analytics...</p>
-        <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      <div className="geospatial-canvas" style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
+        <div style={{ padding: '40px', textAlign: 'center' }}>
+          <RefreshCw size={36} className="spin" color="#0284c7" style={{ animation: 'spin 1s linear infinite' }} />
+          <p style={{ marginTop: '16px', color: '#64748b', fontWeight: 600, fontSize: '0.95rem' }}>Loading photogrammetric diagnostics...</p>
+          <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div style={{ padding: '40px', maxWidth: '800px', margin: '0 auto' }}>
-        <div style={{
-          background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)',
-          borderRadius: '10px', padding: '24px', color: '#fca5a5',
-          display: 'flex', alignItems: 'flex-start', gap: '16px'
-        }}>
-          <AlertTriangle size={24} style={{ flexShrink: 0 }} />
-          <div>
-            <h3 style={{ margin: '0 0 8px 0', fontSize: '1.1rem' }}>Report Unavailable</h3>
-            <p style={{ margin: 0, opacity: 0.8 }}>{error}</p>
+      <div className="geospatial-canvas" style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
+        <div style={{ padding: '40px', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
+          <div style={{
+            background: '#fef2f2', border: '1px solid #fecaca',
+            borderRadius: '12px', padding: '24px', color: '#991b1b',
+            display: 'flex', alignItems: 'flex-start', gap: '16px',
+            boxShadow: '0 2px 10px rgba(220, 38, 38, 0.06)'
+          }}>
+            <AlertTriangle size={24} style={{ flexShrink: 0, color: '#dc2626' }} />
+            <div>
+              <h3 style={{ margin: '0 0 8px 0', fontSize: '1.1rem', fontWeight: 700, color: '#991b1b' }}>Report Unavailable</h3>
+              <p style={{ margin: 0, color: '#7f1d1d', fontSize: '0.9rem' }}>{error}</p>
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
+  const getTabStyle = (tabKey, isAvailable) => {
+    const isActive = activeTab === tabKey;
+    if (!isAvailable) {
+      return {
+        background: '#f8fafc',
+        color: '#94a3b8',
+        border: '1px solid #e2e8f0',
+        padding: '8px 16px',
+        borderRadius: '8px',
+        fontWeight: 600,
+        fontSize: '0.82rem',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        cursor: 'not-allowed',
+        opacity: 0.65,
+        transition: 'all 0.2s'
+      };
+    }
+    if (isActive) {
+      return {
+        background: 'rgba(2, 132, 199, 0.12)',
+        color: '#0284c7',
+        border: '1px solid #0284c7',
+        boxShadow: '0 2px 6px rgba(2, 132, 199, 0.18)',
+        padding: '8px 16px',
+        borderRadius: '8px',
+        fontWeight: 700,
+        fontSize: '0.82rem',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        cursor: 'pointer',
+        transition: 'all 0.2s'
+      };
+    }
+    return {
+      background: '#ffffff',
+      color: '#475569',
+      border: '1px solid #e2e8f0',
+      boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
+      padding: '8px 16px',
+      borderRadius: '8px',
+      fontWeight: 600,
+      fontSize: '0.82rem',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      cursor: 'pointer',
+      transition: 'all 0.2s'
+    };
+  };
+
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 24px' }}>
-      
-      {/* Header */}
-      <div style={{ marginBottom: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-          <Activity size={28} color="#a78bfa" />
-          <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#fff', margin: 0 }}>
-            Analytics Dashboard
+    <div className="geospatial-canvas analytics-dashboard-root" style={{ minHeight: '100vh', position: 'relative', overflowX: 'hidden' }}>
+      <div className="topographic-overlay" />
+      <div style={{ maxWidth: '1360px', margin: '0 auto', padding: '36px 24px 60px 24px', position: 'relative', zIndex: 2 }}>
+        
+        {/* Header */}
+        <div style={{ marginBottom: '28px' }}>
+          <div style={{ 
+            display: 'inline-flex', 
+            alignItems: 'center', 
+            gap: '8px', 
+            padding: '5px 14px', 
+            borderRadius: '20px', 
+            background: 'rgba(2, 132, 199, 0.08)', 
+            border: '1px solid rgba(2, 132, 199, 0.22)', 
+            marginBottom: '14px' 
+          }}>
+            <BarChart2 size={15} color="#0284c7" />
+            <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0369a1', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              PHOTOGRAMMETRY QUALITY & BENCHMARK ANALYTICS
+            </span>
+          </div>
+          <h1 style={{ fontSize: '2.2rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.03em' }}>
+            Diagnostics & Analytics Dashboard
           </h1>
+          <p style={{ margin: '6px 0 0 0', color: '#64748b', fontSize: '0.92rem' }}>
+            Telemetry across pipeline phases: frame filtering, dynamic occlusion masking, camera trajectory estimation, and surface reconstruction.
+          </p>
         </div>
-      </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '32px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px', flexWrap: 'wrap' }}>
-        <button
-          onClick={() => setActiveTab('quality')}
-          disabled={!qualityReport}
-          style={{
-            background: activeTab === 'quality' ? 'rgba(167,139,250,0.15)' : 'transparent',
-            color: activeTab === 'quality' ? '#a78bfa' : (qualityReport ? '#e2e8f0' : 'var(--text-muted)'),
-            border: `1px solid ${activeTab === 'quality' ? '#a78bfa55' : 'transparent'}`,
-            padding: '8px 16px', borderRadius: '8px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px',
-            cursor: qualityReport ? 'pointer' : 'not-allowed', transition: 'all 0.2s'
-          }}
-        >
-          <Activity size={16} /> Phase 2: Frame Quality
-        </button>
-        <button
-          onClick={() => setActiveTab('keyframes')}
-          disabled={!keyframesReport}
-          style={{
-            background: activeTab === 'keyframes' ? 'rgba(56,189,248,0.15)' : 'transparent',
-            color: activeTab === 'keyframes' ? '#38bdf8' : (keyframesReport ? '#e2e8f0' : 'var(--text-muted)'),
-            border: `1px solid ${activeTab === 'keyframes' ? '#38bdf855' : 'transparent'}`,
-            padding: '8px 16px', borderRadius: '8px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px',
-            cursor: keyframesReport ? 'pointer' : 'not-allowed', transition: 'all 0.2s'
-          }}
-        >
-          <Scissors size={16} /> Phase 3: Keyframes
-        </button>
-        <button
-          onClick={() => setActiveTab('dynamic')}
-          disabled={!dynamicReport}
-          style={{
-            background: activeTab === 'dynamic' ? 'rgba(251,191,36,0.15)' : 'transparent',
-            color: activeTab === 'dynamic' ? '#fbbf24' : (dynamicReport ? '#e2e8f0' : 'var(--text-muted)'),
-            border: `1px solid ${activeTab === 'dynamic' ? '#fbbf2455' : 'transparent'}`,
-            padding: '8px 16px', borderRadius: '8px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px',
-            cursor: dynamicReport ? 'pointer' : 'not-allowed', transition: 'all 0.2s'
-          }}
-        >
-          <Shield size={16} /> Phase 4: Dynamic Masking
-        </button>
-        <button
-          onClick={() => setActiveTab('illumination')}
-          disabled={!illuminationReport}
-          style={{
-            background: activeTab === 'illumination' ? 'rgba(245,158,11,0.15)' : 'transparent',
-            color: activeTab === 'illumination' ? '#f59e0b' : (illuminationReport ? '#e2e8f0' : 'var(--text-muted)'),
-            border: `1px solid ${activeTab === 'illumination' ? '#f59e0b55' : 'transparent'}`,
-            padding: '8px 16px', borderRadius: '8px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px',
-            cursor: illuminationReport ? 'pointer' : 'not-allowed', transition: 'all 0.2s'
-          }}
-        >
-          <Sun size={16} /> Phase 5: Illumination Preprocessing
-        </button>
-        <button
-          onClick={() => setActiveTab('trajectory')}
-          disabled={!trajectoryReport}
-          style={{
-            background: activeTab === 'trajectory' ? 'rgba(16,185,129,0.15)' : 'transparent',
-            color: activeTab === 'trajectory' ? '#10b981' : (trajectoryReport ? '#e2e8f0' : 'var(--text-muted)'),
-            border: `1px solid ${activeTab === 'trajectory' ? '#10b98155' : 'transparent'}`,
-            padding: '8px 16px', borderRadius: '8px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px',
-            cursor: trajectoryReport ? 'pointer' : 'not-allowed', transition: 'all 0.2s'
-          }}
-        >
-          <Navigation size={16} /> Phase 6: Trajectory & Fusion
-        </button>
-        <button
-          onClick={() => setActiveTab('reconstruction')}
-          disabled={!reconstructionReport}
-          style={{
-            background: activeTab === 'reconstruction' ? 'rgba(99,102,241,0.15)' : 'transparent',
-            color: activeTab === 'reconstruction' ? '#818cf8' : (reconstructionReport ? '#e2e8f0' : 'var(--text-muted)'),
-            border: `1px solid ${activeTab === 'reconstruction' ? '#818cf855' : 'transparent'}`,
-            padding: '8px 16px', borderRadius: '8px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px',
-            cursor: reconstructionReport ? 'pointer' : 'not-allowed', transition: 'all 0.2s'
-          }}
-        >
-          <Box size={16} /> Phase 7: Sparse Reconstruction
-        </button>
-        <button
-          onClick={() => setActiveTab('dense')}
-          disabled={!denseReport}
-          style={{
-            background: activeTab === 'dense' ? 'rgba(236,72,153,0.15)' : 'transparent',
-            color: activeTab === 'dense' ? '#f472b6' : (denseReport ? '#e2e8f0' : 'var(--text-muted)'),
-            border: `1px solid ${activeTab === 'dense' ? '#f472b655' : 'transparent'}`,
-            padding: '8px 16px', borderRadius: '8px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px',
-            cursor: denseReport ? 'pointer' : 'not-allowed', transition: 'all 0.2s'
-          }}
-        >
-          <Layers size={16} /> Phase 8: Dense Reconstruction
-        </button>
-        <button
-          onClick={() => setActiveTab('benchmark')}
-          disabled={!benchmarkReport}
-          style={{
-            background: activeTab === 'benchmark' ? 'rgba(2,132,199,0.18)' : 'transparent',
-            color: activeTab === 'benchmark' ? '#38bdf8' : (benchmarkReport ? '#e2e8f0' : 'var(--text-muted)'),
-            border: `1px solid ${activeTab === 'benchmark' ? '#38bdf855' : 'transparent'}`,
-            padding: '8px 16px', borderRadius: '8px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px',
-            cursor: benchmarkReport ? 'pointer' : 'not-allowed', transition: 'all 0.2s'
-          }}
-        >
-          <Activity size={16} /> Phase 15: Validation & Benchmark
-        </button>
-      </div>
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '28px', borderBottom: '1px solid #e2e8f0', paddingBottom: '14px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setActiveTab('quality')}
+            disabled={!qualityReport}
+            style={getTabStyle('quality', !!qualityReport)}
+          >
+            <Activity size={16} /> Phase 2: Frame Quality
+          </button>
+          <button
+            onClick={() => setActiveTab('keyframes')}
+            disabled={!keyframesReport}
+            style={getTabStyle('keyframes', !!keyframesReport)}
+          >
+            <Scissors size={16} /> Phase 3: Keyframes
+          </button>
+          <button
+            onClick={() => setActiveTab('dynamic')}
+            disabled={!dynamicReport}
+            style={getTabStyle('dynamic', !!dynamicReport)}
+          >
+            <Shield size={16} /> Phase 4: Dynamic Masking
+          </button>
+          <button
+            onClick={() => setActiveTab('illumination')}
+            disabled={!illuminationReport}
+            style={getTabStyle('illumination', !!illuminationReport)}
+          >
+            <Sun size={16} /> Phase 5: Illumination Preprocessing
+          </button>
+          <button
+            onClick={() => setActiveTab('trajectory')}
+            disabled={!trajectoryReport}
+            style={getTabStyle('trajectory', !!trajectoryReport)}
+          >
+            <Navigation size={16} /> Phase 6: Trajectory & Fusion
+          </button>
+          <button
+            onClick={() => setActiveTab('reconstruction')}
+            disabled={!reconstructionReport}
+            style={getTabStyle('reconstruction', !!reconstructionReport)}
+          >
+            <Box size={16} /> Phase 7: Sparse Reconstruction
+          </button>
+          <button
+            onClick={() => setActiveTab('dense')}
+            disabled={!denseReport}
+            style={getTabStyle('dense', !!denseReport)}
+          >
+            <Layers size={16} /> Phase 8: Dense Reconstruction
+          </button>
+          <button
+            onClick={() => setActiveTab('benchmark')}
+            disabled={!benchmarkReport}
+            style={getTabStyle('benchmark', !!benchmarkReport)}
+          >
+            <Activity size={16} /> Phase 15: Validation & Benchmark
+          </button>
+        </div>
 
-      {activeTab === 'quality' && qualityReport && <QualityTab report={qualityReport} filterClass={filterClass} setFilterClass={setFilterClass} />}
-      {activeTab === 'keyframes' && keyframesReport && <KeyframesTab report={keyframesReport} qualityReport={qualityReport} />}
-      {activeTab === 'dynamic' && dynamicReport && <DynamicMaskingTab report={dynamicReport} />}
-      {activeTab === 'illumination' && illuminationReport && <IlluminationTab report={illuminationReport} />}
-      {activeTab === 'trajectory' && trajectoryReport && <TrajectoryTab report={trajectoryReport} />}
-      {activeTab === 'reconstruction' && reconstructionReport && <SparseReconstructionTab report={reconstructionReport} activeJobId={activeJobId} />}
-      {activeTab === 'dense' && denseReport && <DenseReconstructionTab report={denseReport} reconstructionReport={reconstructionReport} activeJobId={activeJobId} />}
-      {activeTab === 'benchmark' && benchmarkReport && <BenchmarkTab report={benchmarkReport} activeJobId={activeJobId} />}
-      
+        {activeTab === 'quality' && qualityReport && <QualityTab report={qualityReport} filterClass={filterClass} setFilterClass={setFilterClass} />}
+        {activeTab === 'keyframes' && keyframesReport && <KeyframesTab report={keyframesReport} qualityReport={qualityReport} />}
+        {activeTab === 'dynamic' && dynamicReport && <DynamicMaskingTab report={dynamicReport} />}
+        {activeTab === 'illumination' && illuminationReport && <IlluminationTab report={illuminationReport} />}
+        {activeTab === 'trajectory' && trajectoryReport && <TrajectoryTab report={trajectoryReport} />}
+        {activeTab === 'reconstruction' && reconstructionReport && <SparseReconstructionTab report={reconstructionReport} activeJobId={activeJobId} />}
+        {activeTab === 'dense' && denseReport && <DenseReconstructionTab report={denseReport} reconstructionReport={reconstructionReport} activeJobId={activeJobId} />}
+        {activeTab === 'benchmark' && benchmarkReport && <BenchmarkTab report={benchmarkReport} activeJobId={activeJobId} />}
+      </div>
     </div>
   );
 }
@@ -292,17 +323,17 @@ function QualityTab({ report, filterClass, setFilterClass }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 3fr', gap: '24px', marginBottom: '32px' }}>
         <div style={{
-          background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: '14px', padding: '24px'
+          background: '#ffffff', border: '1px solid #e2e8f0',
+          borderRadius: '14px', padding: '24px', boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)'
         }}>
-          <h3 style={{ margin: '0 0 20px 0', fontSize: '1.05rem', color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <BarChart2 size={18} color="#a78bfa" /> Quality Distribution
+          <h3 style={{ margin: '0 0 20px 0', fontSize: '1.05rem', color: '#0f172a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <BarChart2 size={18} color="#0284c7" /> Quality Distribution
           </h3>
           
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', height: '180px', marginTop: '20px' }}>
             {report.histogram.map((bin, i) => {
               const heightPct = (bin.count / maxHistCount) * 100;
-              const color = bin.bin_start >= 80 ? '#34d399' : (bin.bin_start >= 60 ? '#fbbf24' : '#f87171');
+              const color = bin.bin_start >= 80 ? '#10b981' : (bin.bin_start >= 60 ? '#f59e0b' : '#ef4444');
               return (
                 <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                   <div style={{ 
@@ -310,7 +341,7 @@ function QualityTab({ report, filterClass, setFilterClass }) {
                     borderRadius: '4px 4px 0 0', transition: 'height 0.3s ease',
                     minHeight: bin.count > 0 ? '4px' : '0'
                   }} title={`${bin.count} frames (${bin.bin_start}-${bin.bin_end})`} />
-                  <div style={{ fontSize: '0.65rem', color: 'var(--text-dim)', marginTop: '6px', writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+                  <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '6px', writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
                     {bin.bin_start}-{bin.bin_end}
                   </div>
                 </div>
@@ -320,18 +351,19 @@ function QualityTab({ report, filterClass, setFilterClass }) {
         </div>
 
         <div style={{
-          background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: '14px', padding: '24px', display: 'flex', flexDirection: 'column'
+          background: '#ffffff', border: '1px solid #e2e8f0',
+          borderRadius: '14px', padding: '24px', display: 'flex', flexDirection: 'column',
+          boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <ImageIcon size={18} color="#38bdf8" /> Extracted Frames ({filteredFrames.length})
+            <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#0f172a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ImageIcon size={18} color="#0284c7" /> Extracted Frames ({filteredFrames.length})
             </h3>
-            <div style={{ display: 'flex', gap: '8px', background: 'rgba(0,0,0,0.2)', padding: '4px', borderRadius: '8px' }}>
-              <FilterBtn label="ALL" current={filterClass} onClick={() => setFilterClass('ALL')} color="#94a3b8" />
-              <FilterBtn label="HIGH" current={filterClass} onClick={() => setFilterClass('HIGH')} color="#34d399" />
-              <FilterBtn label="MEDIUM" current={filterClass} onClick={() => setFilterClass('MEDIUM')} color="#fbbf24" />
-              <FilterBtn label="LOW" current={filterClass} onClick={() => setFilterClass('LOW')} color="#f87171" />
+            <div style={{ display: 'flex', gap: '6px', background: '#f1f5f9', border: '1px solid #e2e8f0', padding: '4px', borderRadius: '8px' }}>
+              <FilterBtn label="ALL" current={filterClass} onClick={() => setFilterClass('ALL')} color="#64748b" />
+              <FilterBtn label="HIGH" current={filterClass} onClick={() => setFilterClass('HIGH')} color="#059669" />
+              <FilterBtn label="MEDIUM" current={filterClass} onClick={() => setFilterClass('MEDIUM')} color="#d97706" />
+              <FilterBtn label="LOW" current={filterClass} onClick={() => setFilterClass('LOW')} color="#dc2626" />
             </div>
           </div>
 
@@ -346,9 +378,10 @@ function QualityTab({ report, filterClass, setFilterClass }) {
               
               return (
                 <div key={frame.frame_id} style={{
-                  background: 'rgba(0,0,0,0.2)', border: `1px solid ${b.bg}`, borderRadius: '10px', overflow: 'hidden'
+                  background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden',
+                  boxShadow: '0 1px 2px rgba(15, 23, 42, 0.03)'
                 }}>
-                  <div style={{ height: '140px', background: '#111', position: 'relative' }}>
+                  <div style={{ height: '140px', background: '#0f172a', position: 'relative' }}>
                      <img 
                         src={imgUrl} alt={frame.frame_id}
                         style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'relative', zIndex: 1 }}
@@ -363,7 +396,7 @@ function QualityTab({ report, filterClass, setFilterClass }) {
                   </div>
                   
                   <div style={{ padding: '12px' }}>
-                    <div style={{ fontSize: '0.75rem', color: '#e2e8f0', fontWeight: 600, marginBottom: '8px' }}>{frame.frame_id}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#0f172a', fontWeight: 700, marginBottom: '8px', fontFamily: 'monospace' }}>{frame.frame_id}</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                       <MetricRow icon={Eye} label="Sharpness" value={Math.round(frame.sharpness * 100)} />
                       <MetricRow icon={Sun} label="Exposure" value={Math.round(frame.exposure * 100)} />
@@ -391,20 +424,21 @@ function KeyframesTab({ report, qualityReport }) {
     <>
       <div style={{ display: 'flex', gap: '16px', marginBottom: '32px' }}>
         <div style={{ flex: 1 }}>
-          <StatCard label="Frames Reduced" value={reductionLabel} icon={Scissors} color="#38bdf8" />
+          <StatCard label="Frames Reduced" value={reductionLabel} icon={Scissors} color="#0284c7" />
         </div>
         <div style={{ flex: 1 }}>
-          <StatCard label="Reduction %" value={`${report.reduction_percent}%`} icon={Activity} color="#34d399" />
+          <StatCard label="Reduction %" value={`${report.reduction_percent}%`} icon={Activity} color="#10b981" />
         </div>
       </div>
 
       <div style={{
-        background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: '14px', padding: '24px', display: 'flex', flexDirection: 'column'
+        background: '#ffffff', border: '1px solid #e2e8f0',
+        borderRadius: '14px', padding: '24px', display: 'flex', flexDirection: 'column',
+        boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)'
       }}>
         
-        <h3 style={{ margin: '0 0 20px 0', fontSize: '1.05rem', color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <ImageIcon size={18} color="#38bdf8" /> Selected Keyframes
+        <h3 style={{ margin: '0 0 20px 0', fontSize: '1.05rem', color: '#0f172a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <ImageIcon size={18} color="#0284c7" /> Selected Keyframes
         </h3>
 
         <div style={{ 
@@ -416,16 +450,17 @@ function KeyframesTab({ report, qualityReport }) {
             
             return (
               <div key={kf.keyframe_id} style={{
-                background: 'rgba(0,0,0,0.2)', border: `1px solid rgba(56,189,248,0.2)`, borderRadius: '10px', overflow: 'hidden'
+                background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden',
+                boxShadow: '0 1px 2px rgba(15, 23, 42, 0.03)'
               }}>
-                <div style={{ height: '140px', background: '#111', position: 'relative' }}>
+                <div style={{ height: '140px', background: '#0f172a', position: 'relative' }}>
                    <img 
                       src={imgUrl} alt={`Keyframe ${kf.keyframe_id}`}
                       style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'relative', zIndex: 1 }}
                     />
                    <div style={{
-                     position: 'absolute', top: '8px', right: '8px', zIndex: 2, background: 'rgba(56,189,248,0.15)',
-                     color: '#38bdf8', border: `1px solid #38bdf844`, padding: '2px 8px', borderRadius: '999px',
+                     position: 'absolute', top: '8px', right: '8px', zIndex: 2, background: 'rgba(2,132,199,0.15)',
+                     color: '#0284c7', border: `1px solid rgba(2,132,199,0.3)`, padding: '2px 8px', borderRadius: '999px',
                      fontSize: '0.7rem', fontWeight: 700, backdropFilter: 'blur(4px)'
                    }}>
                      KF {kf.keyframe_id}
@@ -433,11 +468,11 @@ function KeyframesTab({ report, qualityReport }) {
                 </div>
                 
                 <div style={{ padding: '12px' }}>
-                  <div style={{ fontSize: '0.75rem', color: '#e2e8f0', fontWeight: 600, marginBottom: '8px' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#0f172a', fontWeight: 700, marginBottom: '8px', fontFamily: 'monospace' }}>
                     {kf.original_frame_id}
                   </div>
                   
-                  <div style={{ fontSize: '0.75rem', color: '#fbbf24', marginBottom: '8px' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#d97706', marginBottom: '8px' }}>
                     Reason: <strong>{kf.selection_reason}</strong>
                   </div>
 
@@ -459,21 +494,22 @@ function KeyframesTab({ report, qualityReport }) {
 
 // ── Shared Helpers ────────────────────────────────────────────────────────
 
-function StatCard({ label, value, icon: Icon, color }) {
+function StatCard({ label, value, icon: Icon, color = '#0284c7' }) {
   return (
     <div style={{
-      background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
-      borderRadius: '10px', padding: '16px', display: 'flex', alignItems: 'center', gap: '16px'
+      background: '#ffffff', border: '1px solid #e2e8f0',
+      boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
+      borderRadius: '12px', padding: '16px 18px', display: 'flex', alignItems: 'center', gap: '14px'
     }}>
       <div style={{
-        width: 44, height: 44, borderRadius: '10px', background: `${color}15`,
+        width: 44, height: 44, borderRadius: '10px', background: `${color}14`,
         display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
       }}>
         <Icon size={22} color={color} />
       </div>
       <div>
-        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>{label}</div>
-        <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#e2e8f0', lineHeight: 1 }}>{value}</div>
+        <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748b', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
+        <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', lineHeight: 1 }}>{value}</div>
       </div>
     </div>
   );
@@ -483,9 +519,10 @@ function FilterBtn({ label, current, onClick, color }) {
   const active = current === label;
   return (
     <button onClick={onClick} style={{
-      background: active ? `${color}22` : 'transparent',
-      color: active ? color : 'var(--text-muted)',
-      border: `1px solid ${active ? color + '44' : 'transparent'}`,
+      background: active ? '#ffffff' : 'transparent',
+      color: active ? color : '#64748b',
+      border: `1px solid ${active ? '#cbd5e1' : 'transparent'}`,
+      boxShadow: active ? '0 1px 2px rgba(15, 23, 42, 0.06)' : 'none',
       padding: '4px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600,
       cursor: 'pointer', transition: 'all 0.2s'
     }}>
@@ -496,11 +533,11 @@ function FilterBtn({ label, current, onClick, color }) {
 
 function MetricRow({ icon: Icon, label, value }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.7rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-muted)' }}>
-        <Icon size={10} /> {label}
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#64748b' }}>
+        <Icon size={11} /> {label}
       </div>
-      <div style={{ color: '#e2e8f0', fontWeight: 600 }}>{value}</div>
+      <div style={{ color: '#0f172a', fontWeight: 600 }}>{value}</div>
     </div>
   );
 }

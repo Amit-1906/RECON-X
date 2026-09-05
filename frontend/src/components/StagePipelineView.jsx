@@ -36,15 +36,23 @@ export default function StagePipelineView({ stages = [], currentStage, onResumeS
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px' }}>
       {/* Stages Pipeline List */}
-      <div className="glass-panel" style={{ padding: '20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+      <div style={{
+        backgroundColor: '#ffffff',
+        border: '1px solid #e2e8f0',
+        borderRadius: '14px',
+        padding: '24px',
+        boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.02)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', flexWrap: 'wrap', gap: '12px' }}>
           <div>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#fff' }}>Reconstruction Pipeline</h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em', margin: 0 }}>
+              Reconstruction Pipeline
+            </h3>
+            <p style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '3px', margin: 0 }}>
               13 Independent Modular Photogrammetric Stages with Atomic Checkpoints
             </p>
           </div>
-          <div className="badge badge-cyan">
+          <div className="badge badge-cyan" style={{ fontWeight: 700 }}>
             {stages.filter(s => s.status === 'completed').length} / {stages.length} Stages Finished
           </div>
         </div>
@@ -62,48 +70,49 @@ export default function StagePipelineView({ stages = [], currentStage, onResumeS
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '12px 16px',
-                  borderRadius: '8px',
+                  padding: '13px 18px',
+                  borderRadius: '10px',
                   background: isSelected 
-                    ? 'rgba(6, 182, 212, 0.12)' 
-                    : 'rgba(255, 255, 255, 0.02)',
+                    ? 'rgba(2, 132, 199, 0.08)' 
+                    : '#f8fafc',
                   border: isSelected 
-                    ? '1px solid rgba(6, 182, 212, 0.4)' 
-                    : '1px solid rgba(255, 255, 255, 0.05)',
+                    ? '1.5px solid #0284c7' 
+                    : '1px solid #e2e8f0',
+                  boxShadow: isSelected ? '0 2px 8px rgba(2, 132, 199, 0.15)' : 'none',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                   <div style={{
-                    width: '28px',
-                    height: '28px',
-                    borderRadius: '6px',
+                    width: '30px',
+                    height: '30px',
+                    borderRadius: '8px',
                     background: stage.status === 'completed' 
-                      ? 'rgba(16, 185, 129, 0.2)' 
-                      : (stage.status === 'running' ? 'rgba(6, 182, 212, 0.2)' : 'rgba(255, 255, 255, 0.05)'),
-                    color: stage.status === 'completed' ? '#34d399' : (stage.status === 'running' ? '#38bdf8' : 'var(--text-dim)'),
+                      ? 'rgba(16, 185, 129, 0.14)' 
+                      : (stage.status === 'running' ? 'rgba(2, 132, 199, 0.14)' : '#e2e8f0'),
+                    color: stage.status === 'completed' ? '#059669' : (stage.status === 'running' ? '#0284c7' : '#64748b'),
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '0.75rem',
-                    fontWeight: 700
+                    fontSize: '0.78rem',
+                    fontWeight: 800
                   }}>
                     {idx + 1}
                   </div>
 
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontWeight: 600, fontSize: '0.9rem', color: '#fff' }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.92rem', color: isSelected ? '#0284c7' : '#0f172a' }}>
                         {stage.stage_name.replace(/_/g, ' ').toUpperCase()}
                       </span>
                       {stage.execution_time_seconds > 0 && (
-                        <span className="font-mono" style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
+                        <span className="font-mono" style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
                           {stage.execution_time_seconds}s
                         </span>
                       )}
                     </div>
-                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    <p style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px', margin: 0 }}>
                       {STAGE_DESCRIPTIONS[stage.stage_name] || "Reconstruction stage module"}
                     </p>
                   </div>
@@ -111,7 +120,7 @@ export default function StagePipelineView({ stages = [], currentStage, onResumeS
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <StatusBadge status={stage.status} />
-                  <ChevronRight size={16} color="var(--text-dim)" />
+                  <ChevronRight size={16} color={isSelected ? '#0284c7' : '#94a3b8'} />
                 </div>
               </div>
             );
@@ -120,42 +129,53 @@ export default function StagePipelineView({ stages = [], currentStage, onResumeS
       </div>
 
       {/* Selected Stage Detail Drawer */}
-      <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+      <div style={{
+        backgroundColor: '#ffffff',
+        border: '1px solid #e2e8f0',
+        borderRadius: '14px',
+        padding: '24px',
+        boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.02)',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between'
+      }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <span className="badge badge-cyan">Stage {activeDetail?.stage_order}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+            <span className="badge badge-cyan" style={{ fontWeight: 700 }}>Stage {activeDetail?.stage_order}</span>
             <StatusBadge status={activeDetail?.status} />
           </div>
 
-          <h4 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fff', textTransform: 'capitalize' }}>
+          <h4 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', textTransform: 'capitalize', letterSpacing: '-0.02em', margin: 0 }}>
             {activeDetail?.stage_name.replace(/_/g, ' ')}
           </h4>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '6px', lineHeight: 1.4 }}>
+          <p style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '8px', lineHeight: 1.5, margin: '8px 0 0 0' }}>
             {STAGE_DESCRIPTIONS[activeDetail?.stage_name]}
           </p>
 
-          <hr style={{ borderColor: 'var(--border-subtle)', margin: '16px 0' }} />
+          <hr style={{ borderColor: '#f1f5f9', margin: '18px 0' }} />
 
           {/* Metrics list */}
-          <div style={{ marginBottom: '16px' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '8px' }}>
+          <div style={{ marginBottom: '18px' }}>
+            <span style={{ fontSize: '0.74rem', color: '#475569', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.04em', display: 'block', marginBottom: '8px' }}>
               Execution Metrics
             </span>
             {activeDetail?.metrics_json ? (
               <pre className="font-mono" style={{
-                background: 'rgba(0, 0, 0, 0.4)',
-                padding: '10px',
-                borderRadius: '6px',
-                fontSize: '0.75rem',
-                color: '#38bdf8',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                padding: '12px',
+                borderRadius: '8px',
+                fontSize: '0.74rem',
+                color: '#0284c7',
                 maxHeight: '180px',
                 overflowY: 'auto',
-                whiteSpace: 'pre-wrap'
+                whiteSpace: 'pre-wrap',
+                fontWeight: 500
               }}>
                 {JSON.stringify(JSON.parse(activeDetail.metrics_json), null, 2)}
               </pre>
             ) : (
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)', fontStyle: 'italic' }}>
+              <p style={{ fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic', margin: 0 }}>
                 No runtime metrics recorded yet.
               </p>
             )}
@@ -164,16 +184,16 @@ export default function StagePipelineView({ stages = [], currentStage, onResumeS
           {/* Error Details if Failed */}
           {activeDetail?.error_detail && (
             <div style={{
-              background: 'rgba(244, 63, 94, 0.1)',
-              border: '1px solid rgba(244, 63, 94, 0.3)',
-              padding: '10px',
-              borderRadius: '6px',
-              marginBottom: '16px'
+              background: 'rgba(239, 68, 68, 0.08)',
+              border: '1px solid rgba(239, 68, 68, 0.25)',
+              padding: '12px',
+              borderRadius: '8px',
+              marginBottom: '18px'
             }}>
-              <span style={{ fontSize: '0.75rem', color: '#fb7185', fontWeight: 600, display: 'block' }}>
+              <span style={{ fontSize: '0.75rem', color: '#dc2626', fontWeight: 700, display: 'block' }}>
                 Failure Diagnostic
               </span>
-              <p style={{ fontSize: '0.75rem', color: '#fca5a5', marginTop: '4px' }}>
+              <p style={{ fontSize: '0.76rem', color: '#991b1b', marginTop: '4px', margin: '4px 0 0 0' }}>
                 {activeDetail.error_detail}
               </p>
             </div>
@@ -181,11 +201,11 @@ export default function StagePipelineView({ stages = [], currentStage, onResumeS
 
           {/* Checkpoint Path */}
           {activeDetail?.checkpoint_dir && (
-            <div style={{ marginBottom: '16px' }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+            <div style={{ marginBottom: '18px' }}>
+              <span style={{ fontSize: '0.74rem', color: '#475569', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.04em', display: 'block', marginBottom: '4px' }}>
                 Intermediate Checkpoint
               </span>
-              <div className="font-mono" style={{ fontSize: '0.7rem', color: 'var(--text-muted)', wordBreak: 'break-all' }}>
+              <div className="font-mono" style={{ fontSize: '0.72rem', color: '#64748b', wordBreak: 'break-all', background: '#f8fafc', padding: '6px 8px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
                 {activeDetail.checkpoint_dir}
               </div>
             </div>
@@ -197,7 +217,7 @@ export default function StagePipelineView({ stages = [], currentStage, onResumeS
           onClick={() => onResumeStage(activeDetail?.stage_name)}
           disabled={isRunning}
           className="btn-primary"
-          style={{ width: '100%', justifyContent: 'center' }}
+          style={{ width: '100%', justifyContent: 'center', padding: '10px 16px' }}
         >
           <RefreshCw size={14} /> Resume From Stage {activeDetail?.stage_order}
         </button>

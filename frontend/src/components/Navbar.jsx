@@ -20,7 +20,7 @@ export default function Navbar({ activePage, setActivePage, activeMissionId, act
     { id: 'analytics', label: 'Quality Analytics', icon: BarChart3 },
   ];
 
-  const isLight = activePage === 'landing';
+  const isLight = true;
 
   return (
     <header 
