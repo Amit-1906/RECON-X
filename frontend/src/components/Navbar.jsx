@@ -3,25 +3,21 @@ import { Plane, Cpu, ShieldCheck, Activity, Layers, Upload, BarChart3, Box } fro
 import { apiClient } from '../api/client';
 
 // ─── VISUAL CONSTANTS ────────────────────────────────────────────────────────
-// Only visual tokens — no logic changes whatsoever.
+// Light Spatial-Tech Aesthetic — Restrained, High-Precision Aerospace Top Bar
 const NAV_STYLES = {
   // Outer header shell
   header: {
     position: 'sticky',
     top: 0,
     zIndex: 50,
-    // Exact reference match: white-to-sky glassy strip
-    background: 'rgba(248, 252, 255, 0.82)',
-    backdropFilter: 'blur(20px)',
-    WebkitBackdropFilter: 'blur(20px)',
-    borderBottom: '1.5px solid rgba(14, 165, 233, 0.18)',
-    boxShadow:
-      '0 2px 24px rgba(14, 165, 233, 0.07), 0 1px 4px rgba(15, 23, 42, 0.04)',
-    padding: '0 28px',
-    height: '64px',
+    background: '#ffffff',
+    borderBottom: '1px solid var(--border-subtle)',
+    boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
+    padding: '0 24px',
+    height: '58px',
     display: 'flex',
     alignItems: 'center',
-    transition: 'all 0.25s ease',
+    transition: 'border-color 0.2s ease',
   },
 
   // Flex row that fills the header
@@ -37,21 +33,20 @@ const NAV_STYLES = {
   brand: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
+    gap: '10px',
     cursor: 'pointer',
     flexShrink: 0,
     userSelect: 'none',
   },
   brandLogo: {
-    width: '40px',
-    height: '40px',
-    borderRadius: '11px',
-    background: 'linear-gradient(135deg, #0284c7 0%, #0ea5e9 50%, #06b6d4 100%)',
+    width: '34px',
+    height: '34px',
+    borderRadius: '6px',
+    background: '#0f172a',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow:
-      '0 4px 14px rgba(2, 132, 199, 0.30), 0 0 0 1.5px rgba(14, 165, 233, 0.2)',
+    boxShadow: '0 1px 3px rgba(15, 23, 42, 0.15)',
     flexShrink: 0,
   },
   brandTextWrap: {
@@ -67,59 +62,55 @@ const NAV_STYLES = {
   },
   brandNamePrimary: {
     fontWeight: 800,
-    fontSize: '1.08rem',
+    fontSize: '1.02rem',
     letterSpacing: '-0.02em',
     color: '#0f172a',
     fontFamily: 'var(--font-sans)',
   },
   brandNameAccent: {
-    fontWeight: 800,
-    fontSize: '1.08rem',
-    color: '#0284c7',
-    letterSpacing: '-0.02em',
-    fontFamily: 'var(--font-sans)',
+    fontWeight: 700,
+    fontSize: '0.85rem',
+    color: '#0f766e',
+    letterSpacing: '0.04em',
+    fontFamily: 'var(--font-mono)',
   },
   brandSub: {
-    fontSize: '0.6rem',
-    color: '#94a3b8',
+    fontSize: '0.58rem',
+    color: '#64748b',
     letterSpacing: '0.08em',
     textTransform: 'uppercase',
-    fontWeight: 500,
-    fontFamily: 'var(--font-sans)',
-    marginTop: '1px',
+    fontWeight: 600,
+    fontFamily: 'var(--font-mono)',
+    marginTop: '2px',
   },
 
   // ── Centre Nav ─────────────────────────────────────────────────────────────
   nav: {
     display: 'flex',
     alignItems: 'center',
-    gap: '3px',
-    // Light frosted pill container around all tabs — matches reference exactly
-    background: 'rgba(241, 248, 255, 0.7)',
-    backdropFilter: 'blur(8px)',
-    WebkitBackdropFilter: 'blur(8px)',
-    border: '1.5px solid rgba(14, 165, 233, 0.16)',
-    borderRadius: '16px',
-    padding: '5px 6px',
-    boxShadow: 'inset 0 1px 3px rgba(14, 165, 233, 0.06)',
+    gap: '2px',
+    background: '#f1f5f9',
+    border: '1px solid var(--border-subtle)',
+    borderRadius: '8px',
+    padding: '3px',
   },
 
   // Active tab pill
   tabActive: {
     display: 'flex',
     alignItems: 'center',
-    gap: '7px',
-    padding: '7px 16px',
-    borderRadius: '11px',
-    background: 'linear-gradient(135deg, rgba(2,132,199,0.14) 0%, rgba(14,165,233,0.10) 100%)',
-    border: '1.5px solid rgba(2, 132, 199, 0.28)',
-    color: '#0369a1',
-    fontWeight: 700,
-    fontSize: '0.84rem',
+    gap: '6px',
+    padding: '6px 13px',
+    borderRadius: '6px',
+    background: '#ffffff',
+    border: '1px solid var(--border-subtle)',
+    color: '#0f172a',
+    fontWeight: 600,
+    fontSize: '0.8rem',
     cursor: 'pointer',
-    boxShadow: '0 2px 10px rgba(2, 132, 199, 0.12), 0 1px 3px rgba(2, 132, 199, 0.08)',
+    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.05)',
     letterSpacing: '-0.01em',
-    transition: 'all 0.2s ease',
+    transition: 'all 0.15s ease',
     whiteSpace: 'nowrap',
     fontFamily: 'var(--font-sans)',
   },
@@ -128,16 +119,16 @@ const NAV_STYLES = {
   tabInactive: {
     display: 'flex',
     alignItems: 'center',
-    gap: '7px',
-    padding: '7px 14px',
-    borderRadius: '11px',
+    gap: '6px',
+    padding: '6px 12px',
+    borderRadius: '6px',
     background: 'transparent',
-    border: '1.5px solid transparent',
+    border: '1px solid transparent',
     color: '#475569',
     fontWeight: 500,
-    fontSize: '0.84rem',
+    fontSize: '0.8rem',
     cursor: 'pointer',
-    transition: 'all 0.18s ease',
+    transition: 'all 0.15s ease',
     whiteSpace: 'nowrap',
     letterSpacing: '-0.01em',
     fontFamily: 'var(--font-sans)',
@@ -147,45 +138,43 @@ const NAV_STYLES = {
   statusPill: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
-    padding: '7px 15px',
-    borderRadius: '20px',
-    background: 'rgba(240, 253, 250, 0.85)',
-    border: '1.5px solid rgba(5, 150, 105, 0.22)',
-    fontSize: '0.78rem',
-    fontFamily: 'var(--font-sans)',
-    boxShadow: '0 2px 8px rgba(5, 150, 105, 0.06)',
+    gap: '7px',
+    padding: '5px 12px',
+    borderRadius: '6px',
+    background: '#ffffff',
+    border: '1px solid var(--border-subtle)',
+    fontSize: '0.74rem',
+    fontFamily: 'var(--font-mono)',
+    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
     flexShrink: 0,
-    letterSpacing: '-0.005em',
+    letterSpacing: '-0.01em',
   },
   gpuPill: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
-    padding: '7px 15px',
-    borderRadius: '20px',
-    background: 'rgba(240, 249, 255, 0.85)',
-    border: '1.5px solid rgba(14, 165, 233, 0.22)',
-    fontSize: '0.78rem',
-    fontFamily: 'var(--font-sans)',
-    boxShadow: '0 2px 8px rgba(14, 165, 233, 0.06)',
+    gap: '7px',
+    padding: '5px 12px',
+    borderRadius: '6px',
+    background: '#ffffff',
+    border: '1px solid var(--border-subtle)',
+    fontSize: '0.74rem',
+    fontFamily: 'var(--font-mono)',
+    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
     flexShrink: 0,
-    letterSpacing: '-0.005em',
+    letterSpacing: '-0.01em',
   },
 
-  // Pulsing green dot for "System Ready"
   greenDot: {
-    width: '8px',
-    height: '8px',
+    width: '6px',
+    height: '6px',
     borderRadius: '50%',
-    background: '#10b981',
-    boxShadow: '0 0 0 2px rgba(16, 185, 129, 0.25)',
+    background: '#059669',
+    boxShadow: '0 0 0 2px rgba(5, 150, 105, 0.2)',
     flexShrink: 0,
   },
 };
 
 // ─── HOVER HELPER ─────────────────────────────────────────────────────────────
-// Pure CSS-in-JS hover via React state — no external libraries.
 function NavTab({ item, isActive, onClick }) {
   const [hovered, setHovered] = useState(false);
   const Icon = item.icon;
@@ -196,9 +185,8 @@ function NavTab({ item, isActive, onClick }) {
         ...NAV_STYLES.tabInactive,
         ...(hovered
           ? {
-              background: 'rgba(14, 165, 233, 0.08)',
-              border: '1.5px solid rgba(14, 165, 233, 0.18)',
-              color: '#0284c7',
+              background: 'rgba(255, 255, 255, 0.7)',
+              color: '#0f172a',
             }
           : {}),
       };
@@ -212,9 +200,9 @@ function NavTab({ item, isActive, onClick }) {
       style={style}
     >
       <Icon
-        size={15}
-        color={isActive ? '#0369a1' : hovered ? '#0284c7' : '#64748b'}
-        strokeWidth={isActive ? 2.3 : 2}
+        size={14}
+        color={isActive ? '#0f766e' : hovered ? '#0f172a' : '#64748b'}
+        strokeWidth={isActive ? 2.2 : 1.8}
       />
       <span>{item.label}</span>
     </button>
@@ -236,7 +224,7 @@ export default function Navbar({ activePage, setActivePage, activeMissionId, act
     { id: 'landing',        label: 'Overview',         icon: Layers    },
     { id: 'create-mission', label: 'New Mission',       icon: Plane     },
     { id: 'upload',         label: 'Upload Data',       icon: Upload    },
-    { id: 'dashboard',      label: 'Pipeline Monitor',  icon: Activity  },
+    { id: 'dashboard',      label: 'Mission Console',   icon: Activity  },
     { id: 'viewer',         label: '3D Digital Twin',   icon: Box       },
     { id: 'analytics',      label: 'Quality Analytics', icon: BarChart3 },
   ];
@@ -256,14 +244,14 @@ export default function Navbar({ activePage, setActivePage, activeMissionId, act
           style={NAV_STYLES.brand}
         >
           <div style={NAV_STYLES.brandLogo}>
-            <Plane size={21} color="#ffffff" strokeWidth={2.2} />
+            <Plane size={17} color="#ffffff" strokeWidth={2.2} />
           </div>
           <div style={NAV_STYLES.brandTextWrap}>
             <div style={NAV_STYLES.brandNameRow}>
-              <span style={NAV_STYLES.brandNamePrimary}>AEROSCAN</span>
-              <span style={NAV_STYLES.brandNameAccent}>3D</span>
+              <span style={NAV_STYLES.brandNamePrimary}>RECON</span>
+              <span style={NAV_STYLES.brandNameAccent}>-X</span>
             </div>
-            <p style={NAV_STYLES.brandSub}>UAV Photogrammetry Engine</p>
+            <p style={NAV_STYLES.brandSub}>Spatial Intelligence Platform</p>
           </div>
         </div>
 

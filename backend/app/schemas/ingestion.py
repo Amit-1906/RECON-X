@@ -35,7 +35,7 @@ class ExtractFramesRequest(BaseModel):
         default=0.5,
         ge=0.1,
         le=60.0,
-        description="Extract one frame every N seconds of video. Range: 0.1s – 60.0s."
+        description="Base sampling interval. Range: 0.1s – 60.0s."
     )
     max_dimension: int = Field(
         default=1920,
@@ -49,6 +49,45 @@ class ExtractFramesRequest(BaseModel):
         le=100,
         description="JPEG compression quality for stored frames. Range: 50–100."
     )
+    adaptive_sampling: bool = Field(
+        default=True,
+        description="Enable motion-aware and quality-aware adaptive frame selection."
+    )
+    frame_min_interval: float = Field(
+        default=0.2,
+        ge=0.05,
+        le=10.0,
+        description="Minimum seconds between sampled frames during high-motion segments."
+    )
+    frame_max_interval: float = Field(
+        default=2.5,
+        ge=0.2,
+        le=30.0,
+        description="Maximum seconds between sampled frames during low-motion/hover segments."
+    )
+    blur_threshold: float = Field(
+        default=35.0,
+        ge=0.0,
+        description="Laplacian variance threshold below which blurry frames are discarded."
+    )
+    frame_similarity_threshold: float = Field(
+        default=0.92,
+        ge=0.5,
+        le=1.0,
+        description="Threshold above which duplicate or near-duplicate frames are skipped."
+    )
+    min_feature_count: int = Field(
+        default=40,
+        ge=0,
+        description="Minimum feature points required to consider a frame informative."
+    )
+    max_keyframes: int = Field(
+        default=300,
+        ge=2,
+        le=2000,
+        description="Upper ceiling on keyframes extracted to bound downstream compute."
+    )
+
 
 
 # ── Frame Metadata ─────────────────────────────────────────────────────────────

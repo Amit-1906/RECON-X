@@ -542,9 +542,7 @@ function MetricRow({ icon: Icon, label, value }) {
   );
 }
 
-// ── Phase 4: Dynamic Masking Tab ──────────────────────────────────────────
-
-// ── Phase 4: Dynamic Object Detection & Masking Tab ──────────────────────────
+// ── Phase 4: Spatial Intelligence — Dynamic Object Detection & Masking ────────
 
 const VIEW_MODES = ['original', 'detections', 'masks', 'static_reconstruction'];
 const VIEW_LABELS = {
@@ -554,19 +552,60 @@ const VIEW_LABELS = {
   static_reconstruction: 'Static Reconstruction View'
 };
 
+// ─── Shared typography tokens ────────────────────────────────────────────────
+const SI_MONO = "'JetBrains Mono', 'SF Mono', Menlo, monospace";
+const SI_LABEL = { fontFamily: SI_MONO, fontSize: '0.58rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.55)' };
+const SI_VALUE = { fontFamily: SI_MONO, fontSize: '0.78rem', fontWeight: 700, color: '#e2e8f0', letterSpacing: '0.02em' };
+const SI_PANEL = { background: 'rgba(8,14,24,0.82)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(148,163,184,0.1)', borderRadius: '6px' };
+
+// ─── Confidence color (real data, not fake) ───────────────────────────────
+const siConfColor = (conf) => {
+  if (conf >= 0.75) return '#10b981';
+  if (conf >= 0.5)  return '#f59e0b';
+  return '#ef4444';
+};
+
+// ─── Detection Row for intelligence panel ────────────────────────────────
+function SIDetectionRow({ cls, conf, maskType, isSelected, onClick }) {
+  const color = siConfColor(conf);
+  const confPct = Math.round(conf * 100);
+  return (
+    <div onClick={onClick} style={{
+      display: 'flex', alignItems: 'center', gap: '10px', padding: '7px 10px',
+      borderRadius: '5px', cursor: onClick ? 'pointer' : 'default',
+      background: isSelected ? 'rgba(2,132,199,0.08)' : 'transparent',
+      border: `1px solid ${isSelected ? 'rgba(2,132,199,0.18)' : 'transparent'}`,
+      transition: 'all 0.12s ease'
+    }}>
+      {/* small colored indicator */}
+      <span style={{ width: '3px', height: '28px', borderRadius: '2px', background: color, flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ ...SI_VALUE, fontSize: '0.72rem', textTransform: 'capitalize', marginBottom: '3px' }}>{cls}</div>
+        <div style={{ height: '2px', background: 'rgba(148,163,184,0.08)', borderRadius: '2px', overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${confPct}%`, background: color, borderRadius: '2px', opacity: 0.75 }} />
+        </div>
+      </div>
+      <div style={{ flexShrink: 0, textAlign: 'right' }}>
+        <div style={{ ...SI_VALUE, color, fontSize: '0.75rem' }}>{confPct}%</div>
+        {maskType && (
+          <div style={{ fontFamily: SI_MONO, fontSize: '0.52rem', color: maskType === 'Segmented Mask' ? '#10b981' : 'rgba(148,163,184,0.4)', letterSpacing: '0.04em', marginTop: '1px' }}>
+            {maskType === 'Segmented Mask' ? 'polygon' : 'bbox'}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function DynamicMaskingTab({ report }) {
   const [viewMode, setViewMode] = useState('detections');
   const [maskType, setMaskType] = useState('dynamic'); // 'dynamic' or 'static'
   const [showDynamicLayer, setShowDynamicLayer] = useState(false);
   const [selectedClassFilter, setSelectedClassFilter] = useState('ALL');
   const [inspectFrame, setInspectFrame] = useState(null);
+  const [activeFrameIdx, setActiveFrameIdx] = useState(0);
 
-  const confidenceColor = (conf) => {
-    if (conf >= 0.75) return '#34d399';
-    if (conf >= 0.5) return '#fbbf24';
-    return '#f87171';
-  };
-
+  // All existing data logic — untouched
   const getImgUrl = (frame, modeOverride = null) => {
     const activeMode = modeOverride || viewMode;
     if (activeMode === 'detections') {
@@ -583,7 +622,6 @@ function DynamicMaskingTab({ report }) {
     return `/api/v1/system/static?path=${encodeURIComponent(frame.keyframe_path)}`;
   };
 
-  // Filter frames by detected class if class filter is active
   const filteredFrames = report.frames.filter(frame => {
     if (selectedClassFilter === 'ALL') return true;
     if (selectedClassFilter === 'WITH_OBJECTS') return frame.detection_count > 0;
@@ -593,318 +631,295 @@ function DynamicMaskingTab({ report }) {
   const analytics = report.analytics_layer || {};
   const classDist = analytics.class_distribution || {};
   const allObjects = report.dynamic_objects || [];
+  const activeFrame = filteredFrames[activeFrameIdx] || filteredFrames[0] || null;
+  const hasDetections = activeFrame ? activeFrame.detection_count > 0 : false;
+
+  // Aggregate class data from all objects for intelligence panel
+  const classAggregates = Object.entries(classDist).map(([cls, cnt]) => {
+    const matches = allObjects.filter(o => (o.object_class || o.class) === cls);
+    const avgConf = matches.length > 0
+      ? matches.reduce((s, o) => s + o.confidence, 0) / matches.length
+      : 0;
+    return { cls, cnt, avgConf };
+  }).sort((a, b) => b.cnt - a.cnt);
 
   return (
     <>
-      {/* Stats Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '16px', marginBottom: '20px' }}>
-        <StatCard label="Keyframes Analyzed" value={report.total_keyframes} icon={ImageIcon} color="#fbbf24" />
-        <StatCard label="Frames w/ Dynamic Objects" value={report.frames_with_dynamic_objects} icon={Shield} color="#f87171" />
-        <StatCard label="Total Dynamic Detections" value={report.total_detections} icon={Target} color="#a78bfa" />
-        <StatCard label="Segmentation Model" value={report.model_used.replace('.pt', '')} icon={Box} color="#38bdf8" />
-        <StatCard 
-          label="Avg Detection Confidence" 
-          value={analytics.average_confidence ? `${Math.round(analytics.average_confidence * 100)}%` : 'N/A'} 
-          icon={Activity} 
-          color="#34d399" 
-        />
-      </div>
-
-      {/* Probabilistic Disclaimer */}
-      <div style={{
-        background: 'rgba(251,191,36,0.07)',
-        border: '1px solid rgba(251,191,36,0.25)',
-        borderRadius: '10px',
-        padding: '12px 16px',
-        marginBottom: '20px',
-        fontSize: '0.82rem',
-        color: '#fbbf24',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '12px',
-        flexWrap: 'wrap'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <AlertTriangle size={18} style={{ flexShrink: 0 }} />
-          <span>
-            <strong>Probabilistic Dynamic Detection:</strong> Confidence values are exposed for every detected object. 
-            Not all dynamic objects are guaranteed to be detected under high motion blur or extreme angles. Dynamic masks prevent corrupting 3D reconstruction.
-          </span>
-        </div>
-        <div style={{
-          background: 'rgba(52,211,153,0.12)',
-          border: '1px solid rgba(52,211,153,0.3)',
-          color: '#34d399',
-          padding: '4px 10px',
-          borderRadius: '6px',
-          fontSize: '0.75rem',
-          fontWeight: 600,
-          whiteSpace: 'nowrap'
-        }}>
-          Reconstruction Protected
-        </div>
-      </div>
-
-      {/* Control Bar: View Switcher & Dynamic Object Layer Toggle */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '14px',
-        marginBottom: '20px',
-        background: 'rgba(15,23,42,0.65)',
-        border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: '12px',
-        padding: '10px 16px'
-      }}>
-        {/* 4 View Modes Required by Phase 4 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600, marginRight: '4px' }}>
-            View Mode:
-          </span>
-          {VIEW_MODES.map(mode => (
-            <button
-              key={mode}
-              onClick={() => setViewMode(mode)}
-              style={{
-                background: viewMode === mode ? 'rgba(251,191,36,0.22)' : 'rgba(255,255,255,0.04)',
-                color: viewMode === mode ? '#fbbf24' : '#94a3b8',
-                border: `1px solid ${viewMode === mode ? '#fbbf2466' : 'rgba(255,255,255,0.08)'}`,
-                padding: '7px 14px',
-                borderRadius: '8px',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-            >
-              {mode === 'original' && <ImageIcon size={13} />}
-              {mode === 'detections' && <Target size={13} />}
-              {mode === 'masks' && <Filter size={13} />}
-              {mode === 'static_reconstruction' && <Shield size={13} />}
-              {VIEW_LABELS[mode]}
-            </button>
-          ))}
-
-          {/* Sub-toggle if Masks mode is active */}
-          {viewMode === 'masks' && (
-            <div style={{ display: 'flex', gap: '4px', marginLeft: '8px', background: 'rgba(0,0,0,0.4)', padding: '3px', borderRadius: '6px' }}>
-              <button
-                onClick={() => setMaskType('dynamic')}
-                style={{
-                  background: maskType === 'dynamic' ? 'rgba(248,113,113,0.3)' : 'transparent',
-                  color: maskType === 'dynamic' ? '#f87171' : '#94a3b8',
-                  border: 'none',
-                  padding: '3px 8px',
-                  borderRadius: '4px',
-                  fontSize: '0.72rem',
-                  fontWeight: 600,
-                  cursor: 'pointer'
-                }}
-              >
-                Dynamic (255)
-              </button>
-              <button
-                onClick={() => setMaskType('static')}
-                style={{
-                  background: maskType === 'static' ? 'rgba(56,189,248,0.3)' : 'transparent',
-                  color: maskType === 'static' ? '#38bdf8' : '#94a3b8',
-                  border: 'none',
-                  padding: '3px 8px',
-                  borderRadius: '4px',
-                  fontSize: '0.72rem',
-                  fontWeight: 600,
-                  cursor: 'pointer'
-                }}
-              >
-                Static (Inverse)
-              </button>
+      {/* ══ SPATIAL INTELLIGENCE HEADER ══════════════════════════════════════ */}
+      <div style={{ marginBottom: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <span style={{ ...SI_LABEL, color: 'rgba(2,132,199,0.7)' }}>Phase 04</span>
+              <span style={{ width: '24px', height: '1px', background: 'rgba(2,132,199,0.3)' }} />
+              <span style={{ ...SI_LABEL, color: 'rgba(2,132,199,0.7)' }}>Spatial Intelligence</span>
             </div>
-          )}
-        </div>
-
-        {/* Dynamic Object Layer Toggle (Optional Analytics Layer) */}
-        <button
-          onClick={() => setShowDynamicLayer(!showDynamicLayer)}
-          style={{
-            background: showDynamicLayer ? 'rgba(167,139,250,0.22)' : 'rgba(255,255,255,0.05)',
-            color: showDynamicLayer ? '#c084fc' : '#94a3b8',
-            border: `1px solid ${showDynamicLayer ? '#c084fc66' : 'rgba(255,255,255,0.1)'}`,
-            padding: '7px 16px',
-            borderRadius: '8px',
-            fontSize: '0.8rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            transition: 'all 0.2s',
-            boxShadow: showDynamicLayer ? '0 0 12px rgba(167,139,250,0.25)' : 'none'
-          }}
-        >
-          <Layers size={14} color={showDynamicLayer ? '#c084fc' : '#94a3b8'} />
-          Dynamic Object Layer (Analytics)
-          <span style={{
-            fontSize: '0.68rem',
-            padding: '1px 6px',
-            borderRadius: '999px',
-            background: showDynamicLayer ? '#a855f7' : 'rgba(255,255,255,0.1)',
-            color: '#fff',
-            fontWeight: 700
-          }}>
-            {showDynamicLayer ? 'ON' : 'OFF'}
-          </span>
-        </button>
-      </div>
-
-      {/* Dynamic Object Layer (Analytics Drawer) */}
-      {showDynamicLayer && (
-        <div style={{
-          background: 'linear-gradient(145deg, rgba(30,27,75,0.4) 0%, rgba(15,23,42,0.7) 100%)',
-          border: '1px solid rgba(167,139,250,0.3)',
-          borderRadius: '12px',
-          padding: '20px',
-          marginBottom: '24px',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.35)'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Layers size={20} color="#a78bfa" />
-              <div>
-                <h4 style={{ margin: 0, fontSize: '1rem', color: '#fff', fontWeight: 700 }}>Dynamic Object Layer Analytics</h4>
-                <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  Multi-class object tracking and photogrammetric corruption prevention telemetry
-                </p>
+            <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+              Object Detection &amp; Dynamic Masking
+            </h2>
+            <p style={{ margin: '4px 0 0', fontSize: '0.83rem', color: '#64748b', lineHeight: 1.5 }}>
+              Spatial analysis of dynamic objects detected across {report.total_keyframes} keyframes. Model: <code style={{ fontFamily: SI_MONO, fontSize: '0.78rem', background: 'rgba(2,132,199,0.07)', padding: '1px 5px', borderRadius: '3px', color: '#0284c7' }}>{report.model_used}</code>
+            </p>
+          </div>
+          {/* Top-right status pills */}
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '4px 10px', background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '4px' }}>
+              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 4px #10b981' }} />
+              <span style={{ fontFamily: SI_MONO, fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.1em', color: '#10b981' }}>RECONSTRUCTION PROTECTED</span>
+            </div>
+            {analytics.average_confidence && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '4px 10px', background: 'rgba(2,132,199,0.07)', border: '1px solid rgba(2,132,199,0.18)', borderRadius: '4px' }}>
+                <span style={{ fontFamily: SI_MONO, fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.1em', color: '#0284c7' }}>AVG CONF</span>
+                <span style={{ fontFamily: SI_MONO, fontSize: '0.68rem', fontWeight: 700, color: '#7dd3fc' }}>{Math.round(analytics.average_confidence * 100)}%</span>
               </div>
+            )}
+          </div>
+        </div>
+
+        {/* Metric strip */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1px', background: 'rgba(148,163,184,0.1)', borderRadius: '7px', overflow: 'hidden', marginTop: '16px', border: '1px solid rgba(148,163,184,0.1)' }}>
+          {[
+            { label: 'Keyframes', value: report.total_keyframes },
+            { label: 'Frames w/ Dynamic', value: report.frames_with_dynamic_objects, accent: '#ef4444' },
+            { label: 'Total Detections', value: report.total_detections, accent: '#a78bfa' },
+            { label: 'Object Classes', value: Object.keys(classDist).length, accent: '#0284c7' },
+            analytics.max_dynamic_area_percent != null && { label: 'Max Occlusion', value: `${analytics.max_dynamic_area_percent}%`, accent: '#f59e0b' },
+            analytics.average_dynamic_area_percent != null && { label: 'Avg Occlusion', value: `${analytics.average_dynamic_area_percent}%` },
+          ].filter(Boolean).map((m, i) => (
+            <div key={i} style={{ background: '#fff', padding: '10px 14px' }}>
+              <div style={{ ...SI_LABEL, display: 'block', marginBottom: '4px' }}>{m.label}</div>
+              <div style={{ fontFamily: SI_MONO, fontSize: '1.15rem', fontWeight: 800, color: m.accent || '#0f172a', lineHeight: 1 }}>{m.value}</div>
             </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <span style={{
-                fontSize: '0.75rem',
-                background: 'rgba(56,189,248,0.12)',
-                border: '1px solid rgba(56,189,248,0.3)',
-                color: '#38bdf8',
-                padding: '4px 10px',
-                borderRadius: '6px'
-              }}>
-                Max Frame Occlusion: {analytics.max_dynamic_area_percent || 0}%
-              </span>
-              <span style={{
-                fontSize: '0.75rem',
-                background: 'rgba(52,211,153,0.12)',
-                border: '1px solid rgba(52,211,153,0.3)',
-                color: '#34d399',
-                padding: '4px 10px',
-                borderRadius: '6px'
-              }}>
-                Avg Occlusion: {analytics.average_dynamic_area_percent || 0}%
-              </span>
-            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ══ SPLIT-SCREEN LAYOUT ══════════════════════════════════════════════ */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '0', background: '#080e18', borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(148,163,184,0.1)', minHeight: '560px' }}>
+
+        {/* ── LEFT: Visual Intelligence Viewport ───────────────────────────── */}
+        <div style={{ display: 'flex', flexDirection: 'column', position: 'relative', background: '#090d16' }}>
+
+          {/* View controls bar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0', borderBottom: '1px solid rgba(148,163,184,0.08)', flexShrink: 0 }}>
+            {VIEW_MODES.map((mode, i) => {
+              const active = viewMode === mode;
+              const icons = { original: <ImageIcon size={11} />, detections: <Target size={11} />, masks: <Filter size={11} />, static_reconstruction: <Shield size={11} /> };
+              return (
+                <button key={mode} onClick={() => setViewMode(mode)} style={{
+                  flex: 1, padding: '9px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
+                  background: active ? 'rgba(2,132,199,0.12)' : 'transparent',
+                  borderRight: i < VIEW_MODES.length - 1 ? '1px solid rgba(148,163,184,0.07)' : 'none',
+                  borderBottom: active ? '2px solid #0284c7' : '2px solid transparent',
+                  border: 'none', cursor: 'pointer', transition: 'all 0.12s ease',
+                  color: active ? '#7dd3fc' : 'rgba(148,163,184,0.5)',
+                  fontFamily: SI_MONO, fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.08em',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {icons[mode]}
+                  {VIEW_LABELS[mode].toUpperCase()}
+                </button>
+              );
+            })}
+            {/* Mask sub-toggle inline */}
+            {viewMode === 'masks' && (
+              <div style={{ display: 'flex', gap: '4px', padding: '4px 8px', borderLeft: '1px solid rgba(148,163,184,0.08)' }}>
+                {['dynamic', 'static'].map(mt => (
+                  <button key={mt} onClick={() => setMaskType(mt)} style={{
+                    padding: '3px 8px', borderRadius: '3px', cursor: 'pointer', border: 'none',
+                    background: maskType === mt ? (mt === 'dynamic' ? 'rgba(239,68,68,0.2)' : 'rgba(56,189,248,0.2)') : 'transparent',
+                    color: maskType === mt ? (mt === 'dynamic' ? '#f87171' : '#38bdf8') : 'rgba(148,163,184,0.4)',
+                    fontFamily: SI_MONO, fontSize: '0.58rem', fontWeight: 700
+                  }}>
+                    {mt === 'dynamic' ? 'Dynamic' : 'Static'}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Class Filters & Distribution */}
-          <div style={{ marginBottom: '18px' }}>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '8px', fontWeight: 600 }}>
-              Dynamic Classes Distribution (Click to filter frames):
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              <button
-                onClick={() => setSelectedClassFilter('ALL')}
-                style={{
-                  background: selectedClassFilter === 'ALL' ? '#fbbf24' : 'rgba(255,255,255,0.05)',
-                  color: selectedClassFilter === 'ALL' ? '#000' : '#e2e8f0',
-                  border: 'none',
-                  padding: '4px 12px',
-                  borderRadius: '20px',
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  cursor: 'pointer'
-                }}
-              >
-                All Frames ({report.total_keyframes})
-              </button>
-              <button
-                onClick={() => setSelectedClassFilter('WITH_OBJECTS')}
-                style={{
-                  background: selectedClassFilter === 'WITH_OBJECTS' ? '#f87171' : 'rgba(248,113,113,0.15)',
-                  color: selectedClassFilter === 'WITH_OBJECTS' ? '#fff' : '#f87171',
-                  border: '1px solid rgba(248,113,113,0.3)',
-                  padding: '4px 12px',
-                  borderRadius: '20px',
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  cursor: 'pointer'
-                }}
-              >
-                Frames w/ Moving Objects ({report.frames_with_dynamic_objects})
-              </button>
-              {Object.entries(classDist).map(([cls, cnt]) => (
-                <button
-                  key={cls}
-                  onClick={() => setSelectedClassFilter(selectedClassFilter === cls ? 'ALL' : cls)}
+          {/* Main image viewport */}
+          <div style={{ flex: 1, position: 'relative', minHeight: '360px', background: '#060a11' }}>
+            {activeFrame ? (
+              <>
+                <img
+                  src={getImgUrl(activeFrame)}
+                  alt={activeFrame.frame_id}
+                  style={{ width: '100%', height: '100%', objectFit: 'contain', position: 'absolute', inset: 0 }}
+                  onError={e => { e.target.style.opacity = 0.15; }}
+                />
+                {/* Frame ID overlay */}
+                <div style={{ position: 'absolute', top: '10px', left: '10px', ...SI_PANEL, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: '6px', pointerEvents: 'none' }}>
+                  <span style={{ ...SI_LABEL }}>{activeFrame.frame_id}</span>
+                  <span style={{ width: '1px', height: '10px', background: 'rgba(148,163,184,0.15)' }} />
+                  <span style={{ ...SI_LABEL }}>{activeFrame.timestamp_sec.toFixed(2)}s</span>
+                </div>
+                {/* Detection badge */}
+                <div style={{ position: 'absolute', top: '10px', right: '10px', ...SI_PANEL, padding: '4px 8px', pointerEvents: 'none' }}>
+                  {hasDetections ? (
+                    <span style={{ fontFamily: SI_MONO, fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.1em', color: '#ef4444' }}>
+                      {activeFrame.detection_count} OBJECT{activeFrame.detection_count !== 1 ? 'S' : ''} DETECTED
+                    </span>
+                  ) : (
+                    <span style={{ fontFamily: SI_MONO, fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.1em', color: '#10b981' }}>
+                      STATIC SCENE — CLEAN
+                    </span>
+                  )}
+                </div>
+                {/* Dynamic area overlay */}
+                {activeFrame.dynamic_pixel_percent > 0 && (
+                  <div style={{ position: 'absolute', bottom: '10px', left: '10px', ...SI_PANEL, padding: '4px 8px', pointerEvents: 'none' }}>
+                    <span style={{ fontFamily: SI_MONO, fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.08em', color: activeFrame.dynamic_pixel_percent > 10 ? '#ef4444' : '#f59e0b' }}>
+                      {activeFrame.dynamic_pixel_percent}% DYNAMIC AREA
+                    </span>
+                  </div>
+                )}
+                {/* Click to expand */}
+                <button onClick={() => setInspectFrame(activeFrame)} style={{
+                  position: 'absolute', bottom: '10px', right: '10px', ...SI_PANEL,
+                  padding: '4px 8px', border: '1px solid rgba(148,163,184,0.12)',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px',
+                  color: 'rgba(148,163,184,0.6)', background: 'rgba(8,14,24,0.82)',
+                  fontFamily: SI_MONO, fontSize: '0.58rem', fontWeight: 700, letterSpacing: '0.08em'
+                }}>
+                  <Maximize2 size={10} /> INSPECT
+                </button>
+              </>
+            ) : (
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(148,163,184,0.3)' }}>
+                <span style={{ ...SI_LABEL }}>No frames match filter</span>
+              </div>
+            )}
+          </div>
+
+          {/* Frame filmstrip */}
+          <div style={{ borderTop: '1px solid rgba(148,163,184,0.08)', padding: '8px', display: 'flex', gap: '6px', overflowX: 'auto', flexShrink: 0, background: '#060a11' }}>
+            {/* Class filter chips */}
+            <div style={{ display: 'flex', gap: '4px', alignItems: 'center', marginRight: '6px', borderRight: '1px solid rgba(148,163,184,0.08)', paddingRight: '8px', flexShrink: 0 }}>
+              {[
+                { key: 'ALL', label: 'ALL', count: report.total_keyframes },
+                { key: 'WITH_OBJECTS', label: '⚡ DYN', count: report.frames_with_dynamic_objects },
+                ...Object.entries(classDist).map(([cls, cnt]) => ({ key: cls, label: cls.slice(0, 4).toUpperCase(), count: cnt }))
+              ].map(f => (
+                <button key={f.key} onClick={() => { setSelectedClassFilter(f.key); setActiveFrameIdx(0); }}
                   style={{
-                    background: selectedClassFilter === cls ? '#a78bfa' : 'rgba(167,139,250,0.15)',
-                    color: selectedClassFilter === cls ? '#fff' : '#c084fc',
-                    border: '1px solid rgba(167,139,250,0.35)',
-                    padding: '4px 12px',
-                    borderRadius: '20px',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
+                    padding: '3px 7px', borderRadius: '3px', border: 'none', cursor: 'pointer', flexShrink: 0,
+                    background: selectedClassFilter === f.key ? 'rgba(2,132,199,0.2)' : 'rgba(148,163,184,0.06)',
+                    color: selectedClassFilter === f.key ? '#7dd3fc' : 'rgba(148,163,184,0.45)',
+                    fontFamily: SI_MONO, fontSize: '0.55rem', fontWeight: 700, letterSpacing: '0.08em'
                   }}
                 >
-                  <span>{cls}</span>
-                  <span style={{
-                    background: selectedClassFilter === cls ? 'rgba(0,0,0,0.3)' : 'rgba(167,139,250,0.3)',
-                    padding: '1px 6px',
-                    borderRadius: '999px',
-                    fontSize: '0.65rem'
-                  }}>
-                    {cnt}
-                  </span>
+                  {f.label} <span style={{ opacity: 0.6 }}>{f.count}</span>
                 </button>
               ))}
             </div>
+            {/* Thumbnail filmstrip */}
+            {filteredFrames.slice(0, 20).map((frame, idx) => {
+              const isActive = idx === activeFrameIdx;
+              const hasDet = frame.detection_count > 0;
+              return (
+                <div key={frame.frame_id} onClick={() => setActiveFrameIdx(idx)}
+                  style={{
+                    width: '52px', height: '36px', flexShrink: 0, borderRadius: '3px', overflow: 'hidden',
+                    cursor: 'pointer', position: 'relative',
+                    outline: isActive ? '2px solid #0284c7' : hasDet ? '1px solid rgba(239,68,68,0.4)' : '1px solid rgba(148,163,184,0.1)',
+                    outlineOffset: isActive ? '1px' : '0'
+                  }}
+                >
+                  <img src={getImgUrl(frame)} alt={frame.frame_id}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    onError={e => { e.target.style.opacity = 0.1; }}
+                  />
+                  {hasDet && (
+                    <div style={{ position: 'absolute', top: '1px', right: '1px', width: '4px', height: '4px', borderRadius: '50%', background: '#ef4444' }} />
+                  )}
+                </div>
+              );
+            })}
+            {filteredFrames.length > 20 && (
+              <div style={{ width: '52px', height: '36px', flexShrink: 0, borderRadius: '3px', background: 'rgba(148,163,184,0.05)', border: '1px solid rgba(148,163,184,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ ...SI_LABEL, fontSize: '0.52rem' }}>+{filteredFrames.length - 20}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── RIGHT: Intelligence Panel ─────────────────────────────────────── */}
+        <div style={{ borderLeft: '1px solid rgba(148,163,184,0.08)', display: 'flex', flexDirection: 'column', overflowY: 'auto', background: '#0a1020' }}>
+
+          {/* Panel header */}
+          <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(148,163,184,0.08)', flexShrink: 0 }}>
+            <div style={{ ...SI_LABEL, display: 'block', marginBottom: '2px' }}>Intelligence Report</div>
+            <div style={{ fontFamily: SI_MONO, fontSize: '0.82rem', fontWeight: 700, color: '#e2e8f0' }}>Object Detection Analysis</div>
           </div>
 
-          {/* Temporal Motion Timeline */}
-          {analytics.timeline && analytics.timeline.length > 0 && (
-            <div style={{ marginBottom: '18px' }}>
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '8px', fontWeight: 600 }}>
-                Flight Timeline Motion & Occlusion Map:
+          {/* Active frame detections */}
+          {activeFrame && (
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(148,163,184,0.08)', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ ...SI_LABEL }}>Active Frame — Detections</span>
+                <span style={{ fontFamily: SI_MONO, fontSize: '0.58rem', color: 'rgba(148,163,184,0.35)', fontWeight: 600 }}>
+                  {activeFrame.frame_id}
+                </span>
               </div>
-              <div style={{
-                display: 'flex',
-                gap: '4px',
-                height: '36px',
-                alignItems: 'flex-end',
-                background: 'rgba(0,0,0,0.3)',
-                padding: '6px 8px',
-                borderRadius: '8px',
-                overflowX: 'auto'
-              }}>
+              {hasDetections ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  {activeFrame.detections.map((det, di) => (
+                    <SIDetectionRow
+                      key={di}
+                      cls={det.object_class || det.class}
+                      conf={det.confidence}
+                      maskType={det.has_segmentation_mask ? 'Segmented Mask' : 'Bounding Box Fallback'}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '8px 0' }}>
+                  <CheckCircle2 size={13} color="#10b981" />
+                  <span style={{ fontFamily: SI_MONO, fontSize: '0.65rem', color: '#10b981', fontWeight: 600 }}>No dynamic objects — static scene</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Class distribution */}
+          {classAggregates.length > 0 && (
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(148,163,184,0.08)', flexShrink: 0 }}>
+              <div style={{ ...SI_LABEL, display: 'block', marginBottom: '8px' }}>Object Class Distribution</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                {classAggregates.map(({ cls, cnt, avgConf }) => (
+                  <SIDetectionRow
+                    key={cls}
+                    cls={`${cls} ×${cnt}`}
+                    conf={avgConf}
+                    isSelected={selectedClassFilter === cls}
+                    onClick={() => { setSelectedClassFilter(selectedClassFilter === cls ? 'ALL' : cls); setActiveFrameIdx(0); }}
+                  />
+                ))}
+              </div>
+              <button onClick={() => { setSelectedClassFilter('ALL'); setActiveFrameIdx(0); }}
+                style={{ marginTop: '6px', padding: '4px 8px', background: 'transparent', border: '1px solid rgba(148,163,184,0.12)', borderRadius: '3px', cursor: 'pointer', fontFamily: SI_MONO, fontSize: '0.57rem', fontWeight: 700, letterSpacing: '0.08em', color: 'rgba(148,163,184,0.45)', width: '100%' }}>
+                CLEAR FILTER — SHOW ALL
+              </button>
+            </div>
+          )}
+
+          {/* Temporal motion timeline */}
+          {analytics.timeline && analytics.timeline.length > 0 && (
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(148,163,184,0.08)', flexShrink: 0 }}>
+              <div style={{ ...SI_LABEL, display: 'block', marginBottom: '8px' }}>Flight Timeline — Motion Map</div>
+              <div style={{ display: 'flex', gap: '2px', height: '28px', alignItems: 'flex-end', background: 'rgba(0,0,0,0.25)', padding: '4px 6px', borderRadius: '4px', overflowX: 'auto' }}>
                 {analytics.timeline.map((item, idx) => {
                   const hasObjects = item.detection_count > 0;
                   const heightPct = Math.max(15, Math.min(100, item.dynamic_pixel_percent * 4 || 15));
                   return (
-                    <div
-                      key={idx}
+                    <div key={idx}
                       title={`${item.frame_id}: ${item.detection_count} objects, ${item.dynamic_pixel_percent}% area`}
                       style={{
-                        flex: '1 0 16px',
-                        height: `${heightPct}%`,
-                        background: hasObjects ? '#f87171' : '#34d399',
-                        borderRadius: '3px',
-                        opacity: hasObjects ? 0.9 : 0.4,
-                        cursor: 'pointer',
-                        transition: 'transform 0.15s'
+                        flex: '1 0 8px', height: `${heightPct}%`,
+                        background: hasObjects ? '#ef4444' : '#10b981',
+                        borderRadius: '1px', opacity: hasObjects ? 0.85 : 0.35,
+                        cursor: 'pointer', transition: 'transform 0.12s'
                       }}
                       onMouseEnter={e => e.currentTarget.style.transform = 'scaleY(1.2)'}
                       onMouseLeave={e => e.currentTarget.style.transform = 'scaleY(1)'}
@@ -912,343 +927,141 @@ function DynamicMaskingTab({ report }) {
                   );
                 })}
               </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ width: '8px', height: '3px', borderRadius: '1px', background: '#ef4444', display: 'inline-block', opacity: 0.85 }} />
+                  <span style={{ ...SI_LABEL, fontSize: '0.53rem' }}>Dynamic</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ width: '8px', height: '3px', borderRadius: '1px', background: '#10b981', display: 'inline-block', opacity: 0.35 }} />
+                  <span style={{ ...SI_LABEL, fontSize: '0.53rem' }}>Static</span>
+                </div>
+              </div>
             </div>
           )}
 
-          {/* Dynamic Objects Manifest Table */}
-          {allObjects.length > 0 && (
-            <div>
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '8px', fontWeight: 600 }}>
-                dynamic_objects.json Manifest ({allObjects.length} objects):
-              </div>
-              <div style={{ maxHeight: '180px', overflowY: 'auto', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '6px' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.72rem', color: '#e2e8f0' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', textAlign: 'left', color: 'var(--text-muted)' }}>
-                      <th style={{ padding: '6px 8px' }}>Frame ID</th>
-                      <th style={{ padding: '6px 8px' }}>Object Class</th>
-                      <th style={{ padding: '6px 8px' }}>Confidence</th>
-                      <th style={{ padding: '6px 8px' }}>Bounding Box [x1, y1, x2, y2]</th>
-                      <th style={{ padding: '6px 8px' }}>Mask Path</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {allObjects.map((obj, oi) => (
-                      <tr key={oi} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                        <td style={{ padding: '6px 8px', fontFamily: 'monospace', color: '#fbbf24' }}>{obj.frame_id}</td>
-                        <td style={{ padding: '6px 8px', fontWeight: 600, color: '#c084fc' }}>{obj.object_class || obj.class}</td>
-                        <td style={{ padding: '6px 8px', fontWeight: 700, color: confidenceColor(obj.confidence) }}>
-                          {Math.round(obj.confidence * 100)}%
-                        </td>
-                        <td style={{ padding: '6px 8px', fontFamily: 'monospace', color: '#94a3b8' }}>
-                          [{obj.bounding_box ? obj.bounding_box.join(', ') : 'N/A'}]
-                        </td>
-                        <td style={{ padding: '6px 8px', fontFamily: 'monospace', fontSize: '0.68rem', color: '#64748b' }}>
-                          {obj.mask_path ? obj.mask_path.split(/[/\\\\]/).pop() : 'N/A'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+          {/* Analytics layer toggle (preserved exactly) */}
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(148,163,184,0.08)', flexShrink: 0 }}>
+            <div style={{ ...SI_LABEL, display: 'block', marginBottom: '8px' }}>Analytics Layer</div>
+            <button onClick={() => setShowDynamicLayer(!showDynamicLayer)}
+              style={{
+                width: '100%', padding: '7px 12px', borderRadius: '5px', cursor: 'pointer',
+                background: showDynamicLayer ? 'rgba(167,139,250,0.12)' : 'rgba(148,163,184,0.04)',
+                border: `1px solid ${showDynamicLayer ? 'rgba(167,139,250,0.3)' : 'rgba(148,163,184,0.12)'}`,
+                display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.15s ease',
+                color: showDynamicLayer ? '#c084fc' : 'rgba(148,163,184,0.55)',
+                fontFamily: SI_MONO, fontSize: '0.63rem', fontWeight: 700, letterSpacing: '0.08em'
+              }}>
+              <Layers size={13} />
+              DYNAMIC OBJECT MANIFEST
+              <span style={{
+                marginLeft: 'auto', padding: '1px 5px', borderRadius: '2px',
+                background: showDynamicLayer ? 'rgba(167,139,250,0.3)' : 'rgba(148,163,184,0.1)',
+                fontSize: '0.55rem', color: showDynamicLayer ? '#e879f9' : 'rgba(148,163,184,0.4)'
+              }}>
+                {showDynamicLayer ? 'ON' : 'OFF'}
+              </span>
+            </button>
+          </div>
+
+          {/* Probabilistic disclaimer — preserved, restyled */}
+          <div style={{ padding: '12px 16px', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)', borderRadius: '5px', padding: '9px 12px' }}>
+              <AlertTriangle size={13} color="#f59e0b" style={{ flexShrink: 0, marginTop: '1px' }} />
+              <p style={{ margin: 0, fontFamily: SI_MONO, fontSize: '0.58rem', lineHeight: 1.6, color: 'rgba(148,163,184,0.55)', letterSpacing: '0.01em' }}>
+                Probabilistic detection — not all dynamic objects are guaranteed detected under high motion blur or extreme angles. Dynamic masks prevent 3D reconstruction corruption.
+              </p>
             </div>
-          )}
+          </div>
+        </div>
+      </div>
+
+      {/* ══ DYNAMIC OBJECT MANIFEST TABLE (preserved, shows when toggled) ══ */}
+      {showDynamicLayer && allObjects.length > 0 && (
+        <div style={{ marginTop: '12px', background: '#080e18', border: '1px solid rgba(167,139,250,0.2)', borderRadius: '8px', overflow: 'hidden' }}>
+          <div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(167,139,250,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Layers size={14} color="#a78bfa" />
+              <span style={{ fontFamily: SI_MONO, fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.08em', color: '#c084fc' }}>DYNAMIC OBJECTS MANIFEST</span>
+              <span style={{ fontFamily: SI_MONO, fontSize: '0.58rem', color: 'rgba(148,163,184,0.4)', fontWeight: 600 }}>({allObjects.length} objects)</span>
+            </div>
+            {analytics.max_dynamic_area_percent != null && (
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <span style={{ fontFamily: SI_MONO, fontSize: '0.58rem', background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.2)', color: '#38bdf8', padding: '2px 8px', borderRadius: '3px', fontWeight: 700 }}>
+                  Max Occlusion: {analytics.max_dynamic_area_percent}%
+                </span>
+                <span style={{ fontFamily: SI_MONO, fontSize: '0.58rem', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', color: '#10b981', padding: '2px 8px', borderRadius: '3px', fontWeight: 700 }}>
+                  Avg Occlusion: {analytics.average_dynamic_area_percent}%
+                </span>
+              </div>
+            )}
+          </div>
+          <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.68rem', color: '#e2e8f0' }}>
+              <thead style={{ position: 'sticky', top: 0, background: '#0a1020', zIndex: 1 }}>
+                <tr style={{ borderBottom: '1px solid rgba(148,163,184,0.08)', textAlign: 'left' }}>
+                  {['Frame ID', 'Class', 'Confidence', 'Bounding Box', 'Mask'].map(h => (
+                    <th key={h} style={{ padding: '6px 10px', ...SI_LABEL, fontSize: '0.55rem' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {allObjects.map((obj, oi) => (
+                  <tr key={oi} style={{ borderBottom: '1px solid rgba(148,163,184,0.04)' }}>
+                    <td style={{ padding: '5px 10px', fontFamily: SI_MONO, fontSize: '0.65rem', color: '#f59e0b' }}>{obj.frame_id}</td>
+                    <td style={{ padding: '5px 10px', fontFamily: SI_MONO, fontSize: '0.65rem', fontWeight: 700, color: '#c084fc', textTransform: 'capitalize' }}>{obj.object_class || obj.class}</td>
+                    <td style={{ padding: '5px 10px', fontFamily: SI_MONO, fontSize: '0.65rem', fontWeight: 700, color: siConfColor(obj.confidence) }}>{Math.round(obj.confidence * 100)}%</td>
+                    <td style={{ padding: '5px 10px', fontFamily: SI_MONO, fontSize: '0.62rem', color: 'rgba(148,163,184,0.5)' }}>[{obj.bounding_box ? obj.bounding_box.join(', ') : 'N/A'}]</td>
+                    <td style={{ padding: '5px 10px', fontFamily: SI_MONO, fontSize: '0.6rem', color: 'rgba(148,163,184,0.35)' }}>{obj.mask_path ? obj.mask_path.split(/[/\\]/).pop() : 'N/A'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
-      {/* Frame Grid */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))',
-        gap: '18px',
-        overflowY: 'auto',
-        maxHeight: '680px',
-        paddingRight: '4px'
-      }}>
-        {filteredFrames.map(frame => {
-          const hasDetections = frame.detection_count > 0;
-
-          return (
-            <div
-              key={frame.frame_id}
-              onClick={() => setInspectFrame(frame)}
-              style={{
-                background: 'rgba(15,23,42,0.6)',
-                border: `1px solid ${hasDetections ? 'rgba(248,113,113,0.35)' : 'rgba(255,255,255,0.08)'}`,
-                borderRadius: '12px',
-                overflow: 'hidden',
-                cursor: 'pointer',
-                transition: 'transform 0.2s, border-color 0.2s, box-shadow 0.2s',
-                boxShadow: hasDetections ? '0 4px 16px rgba(248,113,113,0.08)' : 'none'
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.borderColor = '#fbbf24';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.borderColor = hasDetections ? 'rgba(248,113,113,0.35)' : 'rgba(255,255,255,0.08)';
-              }}
-            >
-              {/* Thumbnail Container */}
-              <div style={{ height: '175px', background: '#090d16', position: 'relative', overflow: 'hidden' }}>
-                <img
-                  src={getImgUrl(frame)}
-                  alt={frame.frame_id}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  onError={e => { e.target.style.opacity = 0.2; }}
-                />
-
-                {/* View Mode Tag */}
-                <div style={{
-                  position: 'absolute',
-                  top: '8px',
-                  left: '8px',
-                  background: 'rgba(0,0,0,0.7)',
-                  color: '#fbbf24',
-                  padding: '2px 8px',
-                  borderRadius: '5px',
-                  fontSize: '0.68rem',
-                  fontWeight: 600,
-                  backdropFilter: 'blur(4px)',
-                  border: '1px solid rgba(251,191,36,0.3)'
-                }}>
-                  {VIEW_LABELS[viewMode]}
-                </div>
-
-                {/* Detection Count Badge */}
-                {hasDetections ? (
-                  <div style={{
-                    position: 'absolute',
-                    top: '8px',
-                    right: '8px',
-                    background: 'rgba(239,68,68,0.9)',
-                    color: '#fff',
-                    padding: '3px 9px',
-                    borderRadius: '999px',
-                    fontSize: '0.72rem',
-                    fontWeight: 700,
-                    backdropFilter: 'blur(4px)',
-                    boxShadow: '0 2px 8px rgba(239,68,68,0.5)'
-                  }}>
-                    {frame.detection_count} dynamic object{frame.detection_count !== 1 ? 's' : ''}
-                  </div>
-                ) : (
-                  <div style={{
-                    position: 'absolute',
-                    top: '8px',
-                    right: '8px',
-                    background: 'rgba(16,185,129,0.85)',
-                    color: '#fff',
-                    padding: '2px 8px',
-                    borderRadius: '999px',
-                    fontSize: '0.68rem',
-                    fontWeight: 600,
-                    backdropFilter: 'blur(4px)'
-                  }}>
-                    Static Scene
-                  </div>
-                )}
-
-                {/* Timestamp */}
-                <div style={{
-                  position: 'absolute',
-                  bottom: '8px',
-                  left: '8px',
-                  background: 'rgba(0,0,0,0.75)',
-                  color: '#e2e8f0',
-                  padding: '2px 8px',
-                  borderRadius: '5px',
-                  fontSize: '0.7rem',
-                  fontFamily: 'monospace'
-                }}>
-                  {frame.timestamp_sec.toFixed(2)}s
-                </div>
-
-                {/* Hover Click to Inspect Hint */}
-                <div style={{
-                  position: 'absolute',
-                  bottom: '8px',
-                  right: '8px',
-                  background: 'rgba(0,0,0,0.65)',
-                  color: '#38bdf8',
-                  padding: '2px 6px',
-                  borderRadius: '4px',
-                  fontSize: '0.68rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
-                  <Maximize2 size={10} /> Inspect
-                </div>
-              </div>
-
-              {/* Info Body */}
-              <div style={{ padding: '14px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '0.8rem', color: '#f8fafc', fontWeight: 700, fontFamily: 'monospace' }}>
-                    {frame.frame_id}
-                  </span>
-                  <span style={{
-                    fontSize: '0.7rem',
-                    color: frame.dynamic_pixel_percent > 10 ? '#f87171' : (frame.dynamic_pixel_percent > 0 ? '#fbbf24' : '#34d399'),
-                    fontWeight: 700
-                  }}>
-                    {frame.dynamic_pixel_percent}% dynamic area
-                  </span>
-                </div>
-
-                {/* Detected Objects List */}
-                {hasDetections ? (
-                  <div style={{
-                    borderTop: '1px solid rgba(255,255,255,0.06)',
-                    paddingTop: '10px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '5px'
-                  }}>
-                    {frame.detections.map((det, di) => (
-                      <div
-                        key={di}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          background: 'rgba(0,0,0,0.2)',
-                          padding: '4px 8px',
-                          borderRadius: '6px'
-                        }}
-                      >
-                        <span style={{ fontSize: '0.72rem', color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Target size={11} color="#a78bfa" />
-                          <strong style={{ color: '#c084fc' }}>{det.object_class || det.class}</strong>
-                          {det.has_segmentation_mask ? (
-                            <span style={{ color: '#34d399', fontSize: '0.62rem', background: 'rgba(52,211,153,0.15)', padding: '1px 4px', borderRadius: '3px' }}>
-                              polygon
-                            </span>
-                          ) : (
-                            <span style={{ color: '#94a3b8', fontSize: '0.62rem', background: 'rgba(148,163,184,0.15)', padding: '1px 4px', borderRadius: '3px' }}>
-                              bbox
-                            </span>
-                          )}
-                        </span>
-                        <span style={{
-                          fontSize: '0.72rem',
-                          fontWeight: 700,
-                          color: confidenceColor(det.confidence),
-                          background: 'rgba(0,0,0,0.3)',
-                          padding: '1px 6px',
-                          borderRadius: '4px'
-                        }}>
-                          {Math.round(det.confidence * 100)}% conf
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div style={{
-                    marginTop: '6px',
-                    fontSize: '0.72rem',
-                    color: '#34d399',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '4px 0'
-                  }}>
-                    <CheckCircle2 size={12} /> Clean static keyframe
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Frame Comparison & Object Inspector Modal */}
+      {/* ══ FRAME INSPECTOR MODAL — PRESERVED EXACTLY ═══════════════════════ */}
       {inspectFrame && (
         <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.85)',
-            backdropFilter: 'blur(8px)',
-            zIndex: 1000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '24px'
-          }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}
           onClick={() => setInspectFrame(null)}
         >
           <div
-            style={{
-              background: '#0f172a',
-              border: '1px solid rgba(251,191,36,0.35)',
-              borderRadius: '16px',
-              maxWidth: '1000px',
-              width: '100%',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              padding: '24px',
-              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.7)'
-            }}
+            style={{ background: '#0f172a', border: '1px solid rgba(251,191,36,0.35)', borderRadius: '16px', maxWidth: '1000px', width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '24px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.7)' }}
             onClick={e => e.stopPropagation()}
           >
             {/* Modal Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#fff', fontWeight: 700 }}>
-                  Frame Comparison & Dynamic Masking Inspector
+                  Frame Comparison &amp; Dynamic Masking Inspector
                 </h3>
                 <span style={{ fontSize: '0.8rem', color: '#fbbf24', fontFamily: 'monospace' }}>
                   {inspectFrame.frame_id} (Keyframe #{inspectFrame.keyframe_id} @ {inspectFrame.timestamp_sec.toFixed(2)}s)
                 </span>
               </div>
-              <button
-                onClick={() => setInspectFrame(null)}
-                style={{
-                  background: 'rgba(255,255,255,0.08)',
-                  border: 'none',
-                  color: '#94a3b8',
-                  padding: '6px',
-                  borderRadius: '8px',
-                  cursor: 'pointer'
-                }}
-              >
+              <button onClick={() => setInspectFrame(null)} style={{ background: 'rgba(255,255,255,0.08)', border: 'none', color: '#94a3b8', padding: '6px', borderRadius: '8px', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
             </div>
 
             {/* Side-by-Side Comparison: Original vs Static Reconstruction View */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-              {/* Original */}
               <div style={{ background: '#090d16', borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
                 <div style={{ padding: '8px 12px', background: 'rgba(0,0,0,0.4)', fontSize: '0.78rem', fontWeight: 700, color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <ImageIcon size={14} color="#38bdf8" /> 1. Original Input Frame
                 </div>
-                <img
-                  src={getImgUrl(inspectFrame, 'original')}
-                  alt="Original"
-                  style={{ width: '100%', height: '240px', objectFit: 'contain', background: '#000' }}
-                />
-                <div style={{ padding: '8px 12px', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                  Pristine unmodified frame extracted from flight video.
-                </div>
+                <img src={getImgUrl(inspectFrame, 'original')} alt="Original" style={{ width: '100%', height: '240px', objectFit: 'contain', background: '#000' }} />
+                <div style={{ padding: '8px 12px', fontSize: '0.72rem', color: 'var(--text-muted)' }}>Pristine unmodified frame extracted from flight video.</div>
               </div>
 
-              {/* Static Reconstruction View */}
               <div style={{ background: '#090d16', borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(52,211,153,0.3)' }}>
                 <div style={{ padding: '8px 12px', background: 'rgba(52,211,153,0.12)', fontSize: '0.78rem', fontWeight: 700, color: '#34d399', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Shield size={14} color="#34d399" /> 2. Static Reconstruction View (Clean SfM Input)
                 </div>
-                <img
-                  src={getImgUrl(inspectFrame, 'static_reconstruction')}
-                  alt="Static Reconstruction"
-                  style={{ width: '100%', height: '240px', objectFit: 'contain', background: '#000' }}
-                />
-                <div style={{ padding: '8px 12px', fontSize: '0.72rem', color: '#34d399' }}>
-                  Dynamic objects masked out to prevent 3D reconstruction corruption.
-                </div>
+                <img src={getImgUrl(inspectFrame, 'static_reconstruction')} alt="Static Reconstruction" style={{ width: '100%', height: '240px', objectFit: 'contain', background: '#000' }} />
+                <div style={{ padding: '8px 12px', fontSize: '0.72rem', color: '#34d399' }}>Dynamic objects masked out to prevent 3D reconstruction corruption.</div>
               </div>
             </div>
 
@@ -1256,24 +1069,16 @@ function DynamicMaskingTab({ report }) {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
               <div style={{ background: '#090d16', borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
                 <div style={{ padding: '8px 12px', background: 'rgba(0,0,0,0.4)', fontSize: '0.78rem', fontWeight: 700, color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Target size={14} color="#fbbf24" /> 3. Object Detections & Bboxes
+                  <Target size={14} color="#fbbf24" /> 3. Object Detections &amp; Bboxes
                 </div>
-                <img
-                  src={getImgUrl(inspectFrame, 'detections')}
-                  alt="Detections"
-                  style={{ width: '100%', height: '200px', objectFit: 'contain', background: '#000' }}
-                />
+                <img src={getImgUrl(inspectFrame, 'detections')} alt="Detections" style={{ width: '100%', height: '200px', objectFit: 'contain', background: '#000' }} />
               </div>
 
               <div style={{ background: '#090d16', borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
                 <div style={{ padding: '8px 12px', background: 'rgba(0,0,0,0.4)', fontSize: '0.78rem', fontWeight: 700, color: '#f87171', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Filter size={14} color="#f87171" /> 4. Dynamic Binary Mask (255 = Dynamic)
                 </div>
-                <img
-                  src={getImgUrl(inspectFrame, 'masks')}
-                  alt="Dynamic Mask"
-                  style={{ width: '100%', height: '200px', objectFit: 'contain', background: '#000' }}
-                />
+                <img src={getImgUrl(inspectFrame, 'masks')} alt="Dynamic Mask" style={{ width: '100%', height: '200px', objectFit: 'contain', background: '#000' }} />
               </div>
             </div>
 
@@ -1285,55 +1090,20 @@ function DynamicMaskingTab({ report }) {
                 </h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {inspectFrame.detections.map((det, di) => (
-                    <div
-                      key={di}
-                      style={{
-                        background: 'rgba(255,255,255,0.03)',
-                        border: '1px solid rgba(255,255,255,0.06)',
-                        borderRadius: '8px',
-                        padding: '10px 14px',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        flexWrap: 'wrap',
-                        gap: '10px'
-                      }}
-                    >
+                    <div key={di} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                       <div>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#c084fc' }}>
-                          {det.object_class || det.class}
-                        </span>
-                        <span style={{
-                          marginLeft: '8px',
-                          fontSize: '0.7rem',
-                          background: det.has_segmentation_mask ? 'rgba(52,211,153,0.15)' : 'rgba(148,163,184,0.15)',
-                          color: det.has_segmentation_mask ? '#34d399' : '#94a3b8',
-                          padding: '2px 6px',
-                          borderRadius: '4px'
-                        }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#c084fc' }}>{det.object_class || det.class}</span>
+                        <span style={{ marginLeft: '8px', fontSize: '0.7rem', background: det.has_segmentation_mask ? 'rgba(52,211,153,0.15)' : 'rgba(148,163,184,0.15)', color: det.has_segmentation_mask ? '#34d399' : '#94a3b8', padding: '2px 6px', borderRadius: '4px' }}>
                           {det.has_segmentation_mask ? 'Segmented Mask' : 'Bounding Box Fallback'}
                         </span>
-                        <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontFamily: 'monospace', marginTop: '4px' }}>
-                          BBox: [{det.bounding_box ? det.bounding_box.join(', ') : 'N/A'}]
-                        </div>
+                        <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontFamily: 'monospace', marginTop: '4px' }}>BBox: [{det.bounding_box ? det.bounding_box.join(', ') : 'N/A'}]</div>
                         {det.mask_path && (
-                          <div style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'monospace', marginTop: '2px' }}>
-                            Mask: {det.mask_path.split(/[/\\\\]/).pop()}
-                          </div>
+                          <div style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'monospace', marginTop: '2px' }}>Mask: {det.mask_path.split(/[/\\]/).pop()}</div>
                         )}
                       </div>
-
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{
-                          fontSize: '1rem',
-                          fontWeight: 800,
-                          color: confidenceColor(det.confidence)
-                        }}>
-                          {Math.round(det.confidence * 100)}%
-                        </div>
-                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-                          Confidence Score
-                        </div>
+                        <div style={{ fontSize: '1rem', fontWeight: 800, color: siConfColor(det.confidence) }}>{Math.round(det.confidence * 100)}%</div>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Confidence Score</div>
                       </div>
                     </div>
                   ))}

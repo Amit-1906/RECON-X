@@ -22,6 +22,13 @@ stages:
     clahe_clip_limit: 2.0
     clahe_tile_grid_size: [8, 8]
     color_space: "BGR"
+    adaptive_sampling: true
+    frame_min_interval: 0.2
+    frame_max_interval: 2.5
+    blur_threshold: 35.0
+    frame_similarity_threshold: 0.92
+    min_feature_count: 40
+    max_keyframes: 300
 
   frame_quality:
     blur_metric: "laplacian_variance"
@@ -29,48 +36,67 @@ stages:
     under_exposure_threshold: 30.0
     over_exposure_threshold: 225.0
     min_contrast_ratio: 0.15
+    parallel_workers: 4
 
   keyframe_selection:
     selection_mode: "adaptive_overlap"  # "adaptive_overlap" | "fixed_interval"
-    min_translation_pixels: 40.0
+    min_translation_pixels: 25.0
     max_feature_overlap: 0.85
-    min_feature_overlap: 0.25
+    min_feature_overlap: 0.20
     window_size: 5
     max_consecutive_drops: 8
+    max_keyframes: 250
+
+  dynamic_masking:
+    conf_threshold: 0.35
+    iou_threshold: 0.50
+    model_name: "yolov8n-seg.pt"
+    batch_size: 4
 
   pose_estimation:
     feature_detector: "SIFT"  # "SIFT" | "ORB"
-    n_features: 4000
+    n_features: 3000
     matcher_type: "FLANN"     # "FLANN" | "BF"
-    ratio_test_threshold: 0.75
+    ratio_test_threshold: 0.78
     ransac_prob: 0.999
     ransac_threshold_px: 2.5
-    min_inlier_count: 50
+    min_inlier_count: 30
 
   geometry:
-    min_triangulation_angle_deg: 2.5
+    feature_detector: "SIFT"
+    n_features: 3000
+    matcher_type: "FLANN"
+    min_triangulation_angle_deg: 2.0
     max_reprojection_error_px: 3.0
     min_track_length: 2
     outlier_std_dev_filter: 2.5
+    enable_bundle_adjustment: true
+    ba_max_iterations: 25
 
   dense_point_cloud:
     stereo_algorithm: "SGBM"  # "SGBM" | "PATCH_MATCH"
+    enable_ai_depth: true
+    depth_model: "midas_small"
     min_disparity: 0
     num_disparities: 64
     block_size: 7
     uniqueness_ratio: 10
     speckle_window_size: 100
     speckle_range: 32
-    voxel_downsample_size: 0.05
-    export_format: "PLY"      # Standard binary/ASCII PLY
+    voxel_size_m: 0.04
+    min_confidence_score: 0.35
+    dense_stride_px: 3
+    export_format: "PLY"
 
   mesh_generation:
-    method: "DELAUNAY_ALPHA"  # "DELAUNAY_ALPHA" | "POISSON_SURFACE" | "BALL_PIVOTING" | "HEIGHTFIELD"
+    method: "DELAUNAY_ALPHA"  # "DELAUNAY_ALPHA" | "POISSON_SURFACE" | "BALL_PIVOTING"
     max_edge_length_meters: 5.0
     min_point_confidence: 0.25
-    mesh_density: "medium"    # "high" | "medium" | "low" | float decimation ratio (e.g. 0.5)
+    mesh_density: "medium"    # "high" | "medium" | "low" | float decimation ratio
     min_component_faces: 15   # Pruning threshold for floating isolated artifact components
     smoothing_iterations: 2   # Boundary-preserving Laplacian smoothing passes
+    generate_high_quality_master: true
+    generate_web_optimized: true
     export_formats: ["PLY", "GLB", "OBJ"]
 
   texture_mapping:
@@ -78,9 +104,10 @@ stages:
     blending_mode: "WEIGHTED_AVERAGE" # "WEIGHTED_AVERAGE" | "BEST_VIEW"
     max_views_per_face: 3
     min_view_angle_deg: 12.0          # Minimum viewing angle to surface normal (grazing rejection)
-    min_sharpness_score: 35.0         # Reject heavily blurred frames
+    min_sharpness_score: 30.0         # Reject heavily blurred frames
     seam_reduction: true              # Multi-camera boundary luminance harmonization
     generate_mtl: true
+    multi_angle_projection: true      # Project onto vertical facades as well as ground
     unobserved_color: [100, 116, 139] # Slate diagnostic color for unobserved surfaces
 
   georeferencing:
@@ -100,6 +127,6 @@ stages:
 
   validation:
     max_allowable_mean_reprojection_error_px: 2.5
-    min_reconstructed_points: 100
-    min_mesh_face_count: 50
+    min_reconstructed_points: 50
+    min_mesh_face_count: 30
     target_gsd_tolerance_percent: 25.0

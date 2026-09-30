@@ -92,7 +92,7 @@ export default function App() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-main)' }}>
       <Navbar
         activePage={activePage}
         setActivePage={setActivePage}
@@ -102,24 +102,30 @@ export default function App() {
       <main style={{ flex: 1 }}>
         {renderPage()}
       </main>
-      {(() => {
-        const isLight = true;
-        return (
-          <footer style={{
-            padding: '20px',
-            textAlign: 'center',
-            borderTop: isLight ? '1px solid rgba(14, 165, 233, 0.2)' : '1px solid var(--border-subtle)',
-            fontSize: '0.78rem',
-            fontWeight: 500,
-            color: isLight ? '#475569' : 'var(--text-dim)',
-            background: isLight ? 'rgba(255, 255, 255, 0.92)' : 'rgba(6, 9, 15, 0.95)',
-            backdropFilter: 'blur(12px)',
-            transition: 'all 0.25s ease'
-          }}>
-            UAV Single-Pass 3D Reconstruction Platform • Photogrammetric Engine v1.0 • OpenCV & PyTorch Accelerated
-          </footer>
-        );
-      })()}
+      <footer style={{
+        padding: '16px 24px',
+        borderTop: '1px solid var(--border-subtle)',
+        fontSize: '0.74rem',
+        color: 'var(--text-muted)',
+        background: 'var(--bg-surface)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '12px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '0.04em' }}>RECON-X</span>
+          <span style={{ color: 'var(--border-strong)' }}>•</span>
+          <span>Spatial Intelligence &amp; Photogrammetric Reconstruction Engine</span>
+          <span style={{ color: 'var(--border-strong)' }}>•</span>
+          <span className="font-mono" style={{ fontSize: '0.7rem' }}>v1.0-PROD</span>
+        </div>
+        <div className="font-mono" style={{ fontSize: '0.7rem', display: 'flex', gap: '16px', color: 'var(--text-muted)' }}>
+          <span>DATUM: WGS84 / EPSG:4326</span>
+          <span>COMPUTE: PYTORCH + OPENCV ACCELERATED</span>
+        </div>
+      </footer>
     </div>
   );
 }

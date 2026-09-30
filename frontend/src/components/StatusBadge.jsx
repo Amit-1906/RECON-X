@@ -45,7 +45,7 @@ export default function StatusBadge({ status }) {
   }
 
   return (
-    <span className="badge" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)' }}>
+    <span className="badge" style={{ background: 'var(--bg-surface-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>
       <Clock size={12} /> {status || 'Pending'}
     </span>
   );

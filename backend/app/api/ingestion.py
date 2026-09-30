@@ -16,7 +16,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
-from backend.app.core.database import get_db
+from backend.app.core.database import get_db, SessionLocal
 from backend.app.models.frame import IngestionFrame
 from backend.app.models.mission import Mission
 from backend.app.schemas.ingestion import (
@@ -102,11 +102,18 @@ async def extract_frames(
             detail="Frame extraction is already in progress for this mission."
         )
 
-    # Spawn extraction in a background thread — does not block the HTTP response
-    asyncio.get_event_loop().run_in_executor(
-        None,  # default ThreadPoolExecutor
-        lambda: IngestionService.extract_frames(db, mission_id, config),
-    )
+    # Spawn extraction in a background thread — does not block the HTTP response.
+    # IMPORTANT: We must NOT pass the request-scoped `db` session into the thread.
+    # After this endpoint returns, FastAPI closes that session. The background thread
+    # must create its own independent session via SessionLocal.
+    def _run_extraction_in_thread():
+        thread_db = SessionLocal()
+        try:
+            IngestionService.extract_frames(thread_db, mission_id, config)
+        finally:
+            thread_db.close()
+
+    asyncio.get_event_loop().run_in_executor(None, _run_extraction_in_thread)
 
     return {
         "message": "Frame extraction started.",

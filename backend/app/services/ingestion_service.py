@@ -223,31 +223,95 @@ class IngestionService:
             fps = mission.video_fps or cap.get(cv2.CAP_PROP_FPS) or 30.0
             total_frames = mission.video_total_frames or int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-            # Compute the set of source frame indices to extract
-            interval_frames = max(1, round(fps * config.interval_sec))
-            target_indices = list(range(0, total_frames, interval_frames))
+            # Compute adaptive or fixed extraction parameters
+            min_step = max(1, round(fps * getattr(config, "frame_min_interval", 0.2)))
+            max_step = max(min_step, round(fps * getattr(config, "frame_max_interval", 2.5)))
+            blur_thresh = float(getattr(config, "blur_threshold", 35.0))
+            sim_thresh = float(getattr(config, "frame_similarity_threshold", 0.92))
+            min_features = int(getattr(config, "min_feature_count", 40))
+            max_kf = int(getattr(config, "max_keyframes", 300))
+            use_adaptive = getattr(config, "adaptive_sampling", True)
 
-            logger.info("Extracting %d frames from %d total (interval=%.2fs, every %d frames)",
-                        len(target_indices), total_frames, config.interval_sec, interval_frames)
+            # Relaxed thresholds for aerial drone footage:
+            # Aerial shots of flat terrain have naturally lower Laplacian variance
+            blur_thresh = float(getattr(config, "blur_threshold", 15.0))
+            sim_thresh = float(getattr(config, "frame_similarity_threshold", 0.92))
+            min_features = int(getattr(config, "min_feature_count", 20))
+
+            interval_frames = max(1, round(fps * config.interval_sec))
+            logger.info("Starting frame extraction (adaptive=%s, interval=%.2fs, fps=%.2f, total=%d)",
+                        use_adaptive, config.interval_sec, fps, total_frames)
 
             written_frames = []
             batch_size = 10
+            prev_thumb = None
+            fast_detector = cv2.FastFeatureDetector_create(threshold=20)
 
-            for i, frame_idx in enumerate(target_indices):
+            # Determine candidate indices — use a set for O(1) membership tests
+            if not use_adaptive:
+                candidate_indices = set(range(0, total_frames, interval_frames))
+            else:
+                # Dense candidate scan that adapts step size based on motion and quality
+                candidate_indices = set()
+                curr_idx = 0
+                while curr_idx < total_frames and len(candidate_indices) < max_kf * 3:
+                    candidate_indices.add(curr_idx)
+                    curr_idx += min_step
+
+            curr_idx = 0
+            while cap.isOpened():
+                if len(written_frames) >= max_kf:
+                    logger.info("Reached maximum keyframes ceiling (%d) — stopping extraction.", max_kf)
+                    break
+                    
+                ret, frame = cap.read()
+                if not ret or frame is None:
+                    break
+                    
+                if curr_idx not in candidate_indices:
+                    curr_idx += 1
+                    continue
+                    
+                frame_idx = curr_idx
+                curr_idx += 1
+                
+                h, w = frame.shape[:2]
+
+                # Intelligent Frame Quality & Redundancy Analysis (if adaptive enabled)
+                if use_adaptive and len(written_frames) > 0 and frame_idx < total_frames - 1:
+                    gray_thumb = cv2.cvtColor(cv2.resize(frame, (96, 96), interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2GRAY)
+                    
+                    # 1. Blur Check
+                    lap_var = float(cv2.Laplacian(gray_thumb, cv2.CV_64F).var())
+                    if lap_var < blur_thresh:
+                        # Skip severely blurred frame
+                        continue
+
+                    # 2. Similarity & Motion Check against previous frame
+                    if prev_thumb is not None:
+                        # Normalized correlation similarity (1.0 = identical)
+                        res = cv2.matchTemplate(gray_thumb, prev_thumb, cv2.TM_CCOEFF_NORMED)
+                        sim = float(res[0][0])
+                        if sim > sim_thresh:
+                            # Frame is near-duplicate; skip to save processing time
+                            continue
+
+                    # 3. Informative Feature Count Check
+                    kps = fast_detector.detect(gray_thumb, None)
+                    if len(kps) < min_features:
+                        # Low-texture / featureless frame (e.g. blank sky/wall)
+                        continue
+
+                    prev_thumb = gray_thumb
+                elif len(written_frames) == 0:
+                    prev_thumb = cv2.cvtColor(cv2.resize(frame, (96, 96), interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2GRAY)
+
                 timestamp_sec = round(frame_idx / fps, 6)
                 frame_id = f"frame_{frame_idx:06d}"
                 out_path = frames_dir / f"{frame_id}.jpg"
 
-                # Exact seek to target frame
-                cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
-                ret, frame = cap.read()
-                if not ret or frame is None:
-                    logger.warning("Frame %d could not be decoded — skipping.", frame_idx)
-                    continue
-
                 # Optional downscale
                 if config.max_dimension > 0:
-                    h, w = frame.shape[:2]
                     longest = max(h, w)
                     if longest > config.max_dimension:
                         scale = config.max_dimension / longest
@@ -258,7 +322,6 @@ class IngestionService:
                 encode_params = [cv2.IMWRITE_JPEG_QUALITY, config.jpeg_quality]
                 success = cv2.imwrite(str(out_path), frame, encode_params)
                 if not success:
-                    logger.warning("cv2.imwrite failed for frame %d — skipping.", frame_idx)
                     continue
 
                 file_size = out_path.stat().st_size
@@ -282,11 +345,39 @@ class IngestionService:
                 )
                 db.add(db_frame)
 
-                # Flush progress to DB every batch_size frames
-                if (i + 1) % batch_size == 0:
+                # Flush progress to DB periodically
+                if (len(written_frames)) % batch_size == 0:
                     mission.extracted_frame_count = len(written_frames)
                     db.commit()
-                    logger.debug("Extraction progress: %d/%d frames written", len(written_frames), len(target_indices))
+
+            # Ensure minimum frame count
+            if len(written_frames) < 2 and total_frames >= 2:
+                # Fallback: extract first and last frames
+                for fallback_idx in [0, total_frames - 1]:
+                    if not any(f["frame_index"] == fallback_idx for f in written_frames):
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, fallback_idx)
+                        ret, frame = cap.read()
+                        if ret and frame is not None:
+                            f_id = f"frame_{fallback_idx:06d}"
+                            o_path = frames_dir / f"{f_id}.jpg"
+                            cv2.imwrite(str(o_path), frame, [cv2.IMWRITE_JPEG_QUALITY, config.jpeg_quality])
+                            f_size = o_path.stat().st_size
+                            written_frames.append({
+                                "frame_id": f_id,
+                                "frame_index": fallback_idx,
+                                "timestamp_sec": round(fallback_idx / fps, 6),
+                                "file": o_path.name,
+                                "file_path": str(o_path),
+                                "file_size_bytes": f_size,
+                            })
+                            db.add(IngestionFrame(
+                                mission_id=mission_id,
+                                frame_index=fallback_idx,
+                                frame_id=f_id,
+                                timestamp_sec=round(fallback_idx / fps, 6),
+                                file_path=str(o_path),
+                                file_size_bytes=f_size,
+                            ))
 
             cap.release()
 

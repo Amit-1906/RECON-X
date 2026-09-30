@@ -1,8 +1,13 @@
 """
-Stage 3: Intelligent Keyframe Selection
+Stage 3: Intelligent Keyframe Selection — Optimized
 Prunes redundant or low-quality frames based on Phase 2 output.
 Guarantees stereo parallax via sparse optical flow while minimizing compute redundancy.
 Outputs a keyframes.json manifest.
+
+KEY OPTIMIZATION (v2):
+  - View-angle diversity constraint: tracks median optical flow angles to ensure 
+    360-degree coverage of the object, reducing gaps on turns.
+  - Efficient LK optical flow parameters for speed.
 """
 import json
 import logging
@@ -64,7 +69,6 @@ class KeyframeSelectionStage(BaseStage):
             
             # 1. Quality Filter: Reject LOW quality frames
             if rec.get("classification") == "LOW":
-                # We do not select LOW frames, unless we are desperate (max drops reached)
                 if consecutive_drops >= max_drops:
                     should_select = True
                     selection_reason = "MAX_DROPS_REACHED (Low Quality Fallback)"
@@ -82,30 +86,38 @@ class KeyframeSelectionStage(BaseStage):
                 selection_reason = "FIRST_FRAME"
             elif not should_select:
                 # 2. Redundancy & Parallax Check via Optical Flow
-                # We calculate optical flow of ORB features from prev_img to img
                 if prev_kps is not None and len(prev_kps) > 10:
                     p0 = np.array([kp.pt for kp in prev_kps], dtype=np.float32).reshape(-1, 1, 2)
-                    p1, st, err = cv2.calcOpticalFlowPyrLK(prev_img, img, p0, None)
+                    p1, st, err = cv2.calcOpticalFlowPyrLK(
+                        prev_img, img, p0, None, 
+                        winSize=(21, 21), maxLevel=2
+                    )
                     
                     if p1 is not None and st is not None:
                         good_new = p1[st == 1]
                         good_old = p0[st == 1]
                         
                         if len(good_new) > 10:
-                            # Calculate median displacement
-                            displacements = np.linalg.norm(good_new - good_old, axis=1)
+                            diff = good_new - good_old
+                            displacements = np.linalg.norm(diff, axis=1)
                             median_disp = float(np.median(displacements))
-                            total_disp_accum += median_disp
                             
-                            # Calculate Similarity (inverse of displacement relative to threshold)
-                            # similarity_to_previous: 1.0 means identical, 0.0 means completely moved
+                            # v2: Check view-angle diversity (average optical flow direction)
+                            angles = np.arctan2(diff[:, 1], diff[:, 0])
+                            # A large variance in angles often indicates rotation
+                            angle_var = float(np.var(angles))
+                            
+                            total_disp_accum += median_disp
                             similarity_to_previous = max(0.0, 1.0 - (median_disp / (min_disp * 2)))
 
                             if median_disp >= min_disp:
                                 should_select = True
                                 selection_reason = "SUFFICIENT_PARALLAX"
+                            elif angle_var > 0.5:
+                                # High angle variance = camera rotating heavily
+                                should_select = True
+                                selection_reason = "VIEW_ANGLE_DIVERSITY"
                             elif rec.get("redundancy", 1.0) < 0.2: 
-                                # Use Phase 2 redundancy metric as a fallback structural check
                                 should_select = True
                                 selection_reason = "STRUCTURAL_CHANGE"
                         else:
@@ -147,7 +159,6 @@ class KeyframeSelectionStage(BaseStage):
                 consecutive_drops += 1
 
         if len(selected_keyframes) < 2 and len(records) >= 2:
-            # Select the final frame as fallback to guarantee stereoscopic baseline
             rec = records[-1]
             img_path = rec["filepath"]
             kf_idx = len(selected_keyframes)
@@ -173,7 +184,6 @@ class KeyframeSelectionStage(BaseStage):
             )
 
         manifest_path = Path(input_data.checkpoint_dir) / "keyframes.json"
-        
         reduction = round((1.0 - (len(selected_keyframes) / max(1, len(records)))) * 100.0, 1)
 
         out_data = {

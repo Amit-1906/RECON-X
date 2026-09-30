@@ -72,15 +72,18 @@ def resolve_target_classes(config_classes: Optional[List[str]]) -> Set[str]:
     return target_classes
 
 
-def _get_yolo_model(model_name: str = "yolov8n-seg.pt"):
+def _get_yolo_model(model_name: str = "yolov8n-seg.pt", device: str = "auto"):
     """
-    Lazily loads the YOLO segmentation model.
-    Falls back gracefully with descriptive error if ultralytics is not installed.
+    Lazily loads the YOLO segmentation model via ModelManager.
+    Cached across stages and workers.
     """
     try:
+        from backend.app.core.model_manager import model_manager
+        model = model_manager.get_yolo_model(model_name, device=device)
+        if model is not None:
+            return model
         from ultralytics import YOLO
-        model = YOLO(model_name)
-        return model
+        return YOLO(model_name)
     except ImportError:
         raise StageExecutionError(
             "dynamic_masking",
@@ -270,8 +273,8 @@ class DynamicMaskingStage(BaseStage):
         target_classes = resolve_target_classes(params.get("dynamic_classes"))
 
         # ── 3. Load YOLO Model ───────────────────────────────────────────
-        logger.info(f"Loading YOLO segmentation model: {model_name}")
-        model = _get_yolo_model(model_name)
+        logger.info(f"Loading YOLO segmentation model: {model_name} on {input_data.device}")
+        model = _get_yolo_model(model_name, device=input_data.device)
         class_names: Dict[int, str] = getattr(model, "names", {})
 
         # ── 4. Output Directories ────────────────────────────────────────

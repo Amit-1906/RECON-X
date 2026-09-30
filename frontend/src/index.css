@@ -1,124 +1,339 @@
+/* ==========================================================================
+   RECON-X — Spatial Intelligence & Photogrammetric Engineering Design System
+   Visual Language: Premium Light Spatial-Tech / Aerospace Engineering
+   ========================================================================== */
+
 :root {
+  /* Canvas & Structural Layers */
   --bg-main: #f8fafc;
-  --bg-card: #ffffff;
-  --bg-card-hover: #f1f5f9;
+  --bg-canvas: #f1f5f9;
+  --bg-surface: #ffffff;
+  --bg-surface-subtle: #f8fafc;
+  --bg-surface-hover: #f1f5f9;
   --bg-panel: #ffffff;
+  
+  /* Borders & Precision Dividers */
   --border-subtle: #e2e8f0;
-  --border-active: #0284c7;
-  --primary: #0284c7;
-  --primary-glow: rgba(2, 132, 199, 0.25);
-  --accent: #0ea5e9;
-  --success: #10b981;
-  --warning: #f59e0b;
-  --danger: #ef4444;
-  --text-main: #0f172a;
-  --text-muted: #475569;
-  --text-dim: #64748b;
-  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --border-strong: #cbd5e1;
+  --border-focus: #0f766e;
+  --border-accent: #0284c7;
+  --hairline: rgba(15, 23, 42, 0.08);
+
+  /* Primary Accent Colors - Muted Teal & Technical Aerospace Blue */
+  --primary: #0f766e;
+  --primary-hover: #0d9488;
+  --primary-muted: rgba(15, 118, 110, 0.08);
+  --primary-border: rgba(15, 118, 110, 0.22);
+  
+  --secondary: #0284c7;
+  --secondary-hover: #0369a1;
+  --secondary-muted: rgba(2, 132, 199, 0.08);
+
+  /* Functional Status Accents */
+  --status-ready: #059669;
+  --status-ready-bg: #ecfdf5;
+  --status-ready-border: rgba(5, 150, 105, 0.25);
+  
+  --status-active: #0284c7;
+  --status-active-bg: #f0f9ff;
+  --status-active-border: rgba(2, 132, 199, 0.25);
+  
+  --status-warning: #d97706;
+  --status-warning-bg: #fffbeb;
+  --status-warning-border: rgba(217, 119, 6, 0.25);
+  
+  --status-danger: #dc2626;
+  --status-danger-bg: #fef2f2;
+  --status-danger-border: rgba(220, 38, 38, 0.25);
+
+  /* High-Contrast Technical Typography */
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  --text-dim: #94a3b8;
+
+  /* Font Families */
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, Monaco, monospace;
+
+  /* Engineering Radii */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
+  --radius-pill: 9999px;
+
+  /* Restrained Engineering Elevation Shadows */
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.03);
+  --shadow-md: 0 4px 12px -2px rgba(15, 23, 42, 0.05), 0 2px 4px -1px rgba(15, 23, 42, 0.02);
+  --shadow-lg: 0 12px 24px -4px rgba(15, 23, 42, 0.06), 0 4px 8px -2px rgba(15, 23, 42, 0.02);
 }
 
-* {
+/* Global Reset & Base Setup */
+*, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-body {
+html, body {
   background-color: var(--bg-main);
-  background-image: 
-    radial-gradient(at 0% 0%, rgba(2, 132, 199, 0.06) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(14, 165, 233, 0.05) 0px, transparent 50%),
-    linear-gradient(rgba(2, 132, 199, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(2, 132, 199, 0.03) 1px, transparent 1px);
-  background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
-  color: var(--text-main);
+  color: var(--text-primary);
   font-family: var(--font-sans);
   min-height: 100vh;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
 }
 
-/* Glassmorphism Classes - Modern Light Theme */
-.glass-panel {
-  background: #ffffff;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.02);
-  transition: all 0.25s ease;
+/* ──────────────────────────────────────────────────────────────────────────
+   Spatial Canvas & Subtle Coordinate Grid (Warm Off-White)
+   ────────────────────────────────────────────────────────────────────────── */
+.geospatial-canvas {
+  background-color: var(--bg-main);
+  background-image:
+    /* Fine 32px engineering coordinate grid */
+    linear-gradient(rgba(15, 23, 42, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.025) 1px, transparent 1px);
+  background-size: 32px 32px, 32px 32px;
+  color: var(--text-primary);
+  min-height: 100vh;
+  position: relative;
 }
 
-.glass-panel:hover {
-  border-color: rgba(2, 132, 199, 0.35);
-  box-shadow: 0 8px 30px rgba(2, 132, 199, 0.08);
+/* Subtle Topographic Contour Overlay - Muted and Technical */
+.topographic-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.25;
+  background-image: url("data:image/svg+xml,%3Csvg width='800' height='800' viewBox='0 0 800 800' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 120 C 150 180, 250 80, 400 130 C 550 180, 650 110, 800 160' fill='none' stroke='%230f766e' stroke-width='0.6' stroke-opacity='0.15'/%3E%3Cpath d='M0 240 C 180 320, 280 210, 440 270 C 600 330, 680 230, 800 290' fill='none' stroke='%230f766e' stroke-width='0.6' stroke-opacity='0.12'/%3E%3Cpath d='M0 380 C 130 450, 310 340, 480 410 C 650 480, 710 390, 800 440' fill='none' stroke='%230284c7' stroke-width='0.6' stroke-opacity='0.12'/%3E%3Cpath d='M0 520 C 200 600, 340 480, 520 560 C 700 640, 730 540, 800 590' fill='none' stroke='%230f766e' stroke-width='0.6' stroke-opacity='0.10'/%3E%3Ccircle cx='400' cy='300' r='180' fill='none' stroke='%230284c7' stroke-width='0.5' stroke-dasharray='4,6' stroke-opacity='0.10'/%3E%3C/svg%3E");
+  background-size: 800px 800px;
 }
 
-.glass-header {
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border-bottom: 1px solid #e2e8f0;
+/* ──────────────────────────────────────────────────────────────────────────
+   Surfaces, Panels & Engineering Cards
+   ────────────────────────────────────────────────────────────────────────── */
+.geo-card, .glass-panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
-/* Typography & Badges */
+.geo-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.geo-card-static {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Typography Hierarchy & Technical Utilities
+   ────────────────────────────────────────────────────────────────────────── */
 .font-mono {
   font-family: var(--font-mono);
+  letter-spacing: -0.01em;
 }
 
+.text-tech-label {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+/* Telemetry HUD Chip */
+.telemetry-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-subtle);
+  border: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Status Badges (Restrained & Minimal)
+   ────────────────────────────────────────────────────────────────────────── */
 .badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px;
-  border-radius: 9999px;
-  font-size: 0.75rem;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  font-size: 0.72rem;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.badge-cyan {
-  background: rgba(2, 132, 199, 0.1);
-  color: #0284c7;
-  border: 1px solid rgba(2, 132, 199, 0.25);
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
 }
 
 .badge-success {
-  background: rgba(16, 185, 129, 0.1);
-  color: #059669;
-  border: 1px solid rgba(16, 185, 129, 0.25);
+  background: var(--status-ready-bg);
+  color: var(--status-ready);
+  border-color: var(--status-ready-border);
+}
+
+.badge-cyan {
+  background: var(--status-active-bg);
+  color: var(--status-active);
+  border-color: var(--status-active-border);
 }
 
 .badge-warning {
-  background: rgba(245, 158, 11, 0.1);
-  color: #d97706;
-  border: 1px solid rgba(245, 158, 11, 0.25);
+  background: var(--status-warning-bg);
+  color: var(--status-warning);
+  border-color: var(--status-warning-border);
 }
 
 .badge-danger {
-  background: rgba(239, 68, 68, 0.1);
-  color: #dc2626;
-  border: 1px solid rgba(239, 68, 68, 0.25);
+  background: var(--status-danger-bg);
+  color: var(--status-danger);
+  border-color: var(--status-danger-border);
 }
 
 .badge-purple {
-  background: rgba(168, 85, 247, 0.1);
-  color: #7e22ce;
-  border: 1px solid rgba(168, 85, 247, 0.25);
+  background: #f5f3ff;
+  color: #7c3aed;
+  border-color: rgba(124, 58, 237, 0.22);
 }
 
-/* Precision Engineering CAD Toolbars & HUD - Modern Light Theme */
+/* ──────────────────────────────────────────────────────────────────────────
+   Action Buttons (Crisp, High-Precision Spatial Software Controls)
+   ────────────────────────────────────────────────────────────────────────── */
+.geo-btn-primary, .btn-primary {
+  background: var(--text-primary);
+  color: #ffffff;
+  border: 1px solid var(--text-primary);
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 0.825rem;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  box-shadow: var(--shadow-xs);
+  transition: all 0.15s ease;
+}
+
+.geo-btn-primary:hover, .btn-primary:hover {
+  background: #1e293b;
+  border-color: #1e293b;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.geo-btn-primary:disabled, .btn-primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.geo-btn-secondary, .btn-secondary {
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-strong);
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 0.825rem;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  box-shadow: var(--shadow-xs);
+  transition: all 0.15s ease;
+}
+
+.geo-btn-secondary:hover, .btn-secondary:hover {
+  background: var(--bg-surface-subtle);
+  border-color: var(--text-muted);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Inputs, Sliders & Form Elements
+   ────────────────────────────────────────────────────────────────────────── */
+.form-input, .form-select, .uav-input {
+  width: 100%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 9px 13px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: var(--shadow-xs);
+}
+
+.form-input:focus, .form-select:focus, .uav-input:focus {
+  outline: none;
+  border-color: var(--border-accent);
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.12);
+}
+
+.form-input::placeholder, .uav-input::placeholder {
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+/* Range input sliders */
+input[type="range"] {
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Data Tables (Hairline Grid Lines & Clean Metrics)
+   ────────────────────────────────────────────────────────────────────────── */
+.geo-table-row {
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background-color 0.12s ease;
+}
+
+.geo-table-row:hover {
+  background-color: var(--bg-surface-subtle);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   CAD Toolbars & Viewport HUDs
+   ────────────────────────────────────────────────────────────────────────── */
 .cad-toolbar {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   background: rgba(255, 255, 255, 0.94);
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 5px 8px;
-  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 4px 6px;
+  box-shadow: var(--shadow-sm);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
@@ -126,298 +341,333 @@ body {
 .cad-btn {
   background: transparent;
   border: 1px solid transparent;
-  color: #334155;
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 0.78rem;
+  color: var(--text-secondary);
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.cad-btn:hover {
+  background: var(--bg-surface-subtle);
+  color: var(--text-primary);
+}
+
+.cad-btn.active {
+  background: var(--text-primary);
+  color: #ffffff;
+  border-color: var(--text-primary);
+}
+
+.cad-hud {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-primary);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   RECON-X Professional Digital Twin Inspection Viewport & Floating Interface
+   ────────────────────────────────────────────────────────────────────────── */
+.dt-viewport-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #06080d;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+}
+
+/* Floating Top-Left Header Badge */
+.dt-badge-top-left {
+  position: absolute;
+  top: 18px;
+  left: 20px;
+  z-index: 25;
+  background: rgba(15, 23, 42, 0.78);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 10px 14px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+  user-select: none;
+}
+
+/* Floating Top-Right Action Pill */
+.dt-actions-top-right {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(15, 23, 42, 0.78);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 4px 6px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+}
+
+.dt-action-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #94a3b8;
+  padding: 6px 12px;
+  border-radius: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
-.cad-btn:hover {
-  background: #f1f5f9;
-  color: #0f172a;
+.dt-action-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
 }
 
-.cad-btn.active {
-  background: #0284c7;
+.dt-action-btn.active {
+  background: #0f766e;
   color: #ffffff;
-  border-color: #0284c7;
-  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 1px 4px rgba(15, 118, 110, 0.35);
 }
 
-.cad-hud {
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: #0f172a;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
-}
-
-/* Custom Buttons - Enterprise SaaS Aesthetic */
-.btn-primary {
-  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
-  color: #ffffff;
-  border: 1px solid #0284c7;
-  padding: 8px 18px;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 0.825rem;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);
-  transition: all 0.2s ease;
-}
-
-.btn-primary:hover {
-  background: linear-gradient(135deg, #0369a1 0%, #075985 100%);
-  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);
-  transform: translateY(-1px);
-}
-
-.btn-secondary {
-  background: #ffffff;
-  color: #334155;
-  border: 1px solid #e2e8f0;
-  padding: 8px 18px;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 0.825rem;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
-  transition: all 0.2s ease;
-}
-
-.btn-secondary:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-  color: #0f172a;
-  transform: translateY(-1px);
-}
-
-/* Inputs & Form Controls */
-.form-input, .form-select {
-  width: 100%;
-  background: #ffffff;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 10px 14px;
-  color: #0f172a;
-  font-family: inherit;
-  font-size: 0.9rem;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.form-input:focus, .form-select:focus {
-  outline: none;
-  border-color: #0284c7;
-  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.12);
-}
-
-/* Animations */
-@keyframes pulseGlow {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
-}
-
-.animate-pulse-glow {
-  animation: pulseGlow 2s infinite ease-in-out;
-}
-
-/* Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-track {
-  background: #f1f5f9;
-}
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #334155;
-}
-
-/* ──────────────────────────────────────────────────────────────────────────
-   Light Geospatial Aerial Mapping Command Center Theme
-   ────────────────────────────────────────────────────────────────────────── */
-
-.geospatial-canvas {
-  background-color: #f1f8fa;
-  background-image:
-    radial-gradient(at 15% 15%, rgba(6, 182, 212, 0.14) 0px, transparent 48%),
-    radial-gradient(at 85% 25%, rgba(14, 165, 233, 0.12) 0px, transparent 44%),
-    radial-gradient(at 50% 80%, rgba(20, 184, 166, 0.10) 0px, transparent 52%),
-    radial-gradient(at 80% 85%, rgba(168, 85, 247, 0.05) 0px, transparent 40%),
-    /* Faint geographic coordinate grid */
-    linear-gradient(rgba(2, 132, 199, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(2, 132, 199, 0.04) 1px, transparent 1px);
-  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 48px 48px, 48px 48px;
-  color: #0f172a;
-  min-height: 100vh;
-  position: relative;
-}
-
-/* Topographic Contour Line Overlay */
-.topographic-overlay {
+/* Floating Bottom Control Bar */
+.dt-toolbar-bottom {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  pointer-events: none;
-  opacity: 0.45;
-  background-image: url("data:image/svg+xml,%3Csvg width='800' height='800' viewBox='0 0 800 800' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 120 C 150 180, 250 80, 400 130 C 550 180, 650 110, 800 160' fill='none' stroke='%230284c7' stroke-width='0.75' stroke-opacity='0.12'/%3E%3Cpath d='M0 240 C 180 320, 280 210, 440 270 C 600 330, 680 230, 800 290' fill='none' stroke='%230284c7' stroke-width='0.75' stroke-opacity='0.10'/%3E%3Cpath d='M0 380 C 130 450, 310 340, 480 410 C 650 480, 710 390, 800 440' fill='none' stroke='%230d9488' stroke-width='0.75' stroke-opacity='0.10'/%3E%3Cpath d='M0 520 C 200 600, 340 480, 520 560 C 700 640, 730 540, 800 590' fill='none' stroke='%230284c7' stroke-width='0.75' stroke-opacity='0.08'/%3E%3Cpath d='M0 660 C 160 740, 380 620, 560 700 C 740 780, 750 670, 800 730' fill='none' stroke='%230d9488' stroke-width='0.75' stroke-opacity='0.08'/%3E%3Ccircle cx='400' cy='300' r='180' fill='none' stroke='%230284c7' stroke-width='0.6' stroke-dasharray='4,6' stroke-opacity='0.08'/%3E%3Ccircle cx='400' cy='300' r='280' fill='none' stroke='%230284c7' stroke-width='0.6' stroke-dasharray='4,6' stroke-opacity='0.05'/%3E%3C/svg%3E");
-  background-size: 800px 800px;
-}
-
-/* Translucent White Geospatial Cards */
-.geo-card {
-  background: rgba(255, 255, 255, 0.84);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(14, 165, 233, 0.18);
-  border-radius: 16px;
-  box-shadow: 
-    0 4px 20px -2px rgba(15, 23, 42, 0.05),
-    0 2px 6px -1px rgba(15, 23, 42, 0.02);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.geo-card:hover {
-  border-color: rgba(2, 132, 199, 0.35);
-  box-shadow: 
-    0 12px 32px -4px rgba(2, 132, 199, 0.12),
-    0 4px 12px -2px rgba(15, 23, 42, 0.04);
-  transform: translateY(-2px);
-}
-
-.geo-card-static {
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(14, 165, 233, 0.16);
-  border-radius: 16px;
-  box-shadow: 0 4px 24px -2px rgba(15, 23, 42, 0.06);
-}
-
-/* Geospatial Action Buttons */
-.geo-btn-primary {
-  background: linear-gradient(135deg, #0284c7 0%, #0d9488 100%);
-  color: #ffffff;
-  border: 1px solid #0369a1;
-  padding: 10px 22px;
-  border-radius: 10px;
-  font-weight: 600;
-  font-size: 0.85rem;
-  letter-spacing: -0.01em;
-  cursor: pointer;
-  display: inline-flex;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 25;
+  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.25);
-  transition: all 0.2s ease;
+  gap: 4px;
+  background: rgba(15, 23, 42, 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 5px 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  max-width: 95vw;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.dt-toolbar-bottom::-webkit-scrollbar {
+  display: none;
 }
 
-.geo-btn-primary:hover {
-  background: linear-gradient(135deg, #0369a1 0%, #0f766e 100%);
-  box-shadow: 0 6px 20px rgba(2, 132, 199, 0.38);
-  transform: translateY(-1px);
-}
-
-.geo-btn-secondary {
-  background: rgba(255, 255, 255, 0.92);
-  color: #0f172a;
-  border: 1px solid rgba(14, 165, 233, 0.25);
-  padding: 10px 20px;
-  border-radius: 10px;
-  font-weight: 600;
-  font-size: 0.85rem;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
-  transition: all 0.2s ease;
-}
-
-.geo-btn-secondary:hover {
-  background: #f8fafc;
-  border-color: #0284c7;
-  color: #0284c7;
-  transform: translateY(-1px);
-}
-
-/* Light Table Hover & Spacing */
-.geo-table-row {
-  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
-  transition: background-color 0.15s ease;
-}
-
-.geo-table-row:hover {
-  background-color: rgba(240, 249, 255, 0.7);
-}
-
-/* Telemetry Badge */
-.telemetry-chip {
+.dt-bottom-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #94a3b8;
+  padding: 6px 11px;
+  border-radius: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.69rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.dt-bottom-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+}
+
+.dt-bottom-btn.active {
+  background: #0284c7;
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 1px 4px rgba(2, 132, 199, 0.35);
+}
+
+.dt-bottom-btn.active-teal {
+  background: #0f766e;
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 1px 4px rgba(15, 118, 110, 0.35);
+}
+
+.dt-divider {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.14);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+/* Floating Live Coordinates HUD */
+.dt-coords-hud {
+  position: absolute;
+  top: 70px;
+  right: 20px;
+  z-index: 24;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 6px;
-  background: rgba(2, 132, 199, 0.08);
-  border: 1px solid rgba(2, 132, 199, 0.2);
+  padding: 8px 12px;
   font-family: var(--font-mono);
-  font-size: 0.72rem;
-  color: #0369a1;
-  font-weight: 600;
+  font-size: 0.68rem;
+  color: #e2e8f0;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+}
+
+/* Scale Indicator */
+.dt-scale-indicator {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  z-index: 24;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.dt-scale-rule {
+  width: 44px;
+  height: 2px;
+  background: #cbd5e1;
+  position: relative;
+}
+.dt-scale-rule::before, .dt-scale-rule::after {
+  content: '';
+  position: absolute;
+  width: 1px;
+  height: 6px;
+  background: #cbd5e1;
+  top: -2px;
+}
+.dt-scale-rule::before { left: 0; }
+.dt-scale-rule::after { right: 0; }
+
+/* Floating Engineering Dialog / Panels */
+.dt-floating-panel {
+  position: absolute;
+  z-index: 30;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+  color: #f8fafc;
+}
+
+/* Measurement Banner */
+.dt-measure-banner {
+  position: absolute;
+  top: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 28;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid #0284c7;
+  border-radius: 8px;
+  padding: 8px 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+@media (max-width: 768px) {
+  .dt-badge-top-left {
+    top: 10px;
+    left: 10px;
+    padding: 8px 10px;
+  }
+  .dt-actions-top-right {
+    top: 10px;
+    right: 10px;
+    padding: 3px 4px;
+    gap: 2px;
+  }
+  .dt-action-btn {
+    padding: 5px 8px;
+    font-size: 0.65rem;
+  }
+  .dt-toolbar-bottom {
+    bottom: 10px;
+    padding: 4px 6px;
+  }
+  .dt-bottom-btn {
+    padding: 5px 8px;
+    font-size: 0.65rem;
+  }
+  .dt-coords-hud {
+    display: none;
+  }
+  .dt-scale-indicator {
+    display: none;
+  }
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   UAV Photogrammetry Mission Planner Styles
+   UAV Photogrammetry Mission Planner Layout
    ────────────────────────────────────────────────────────────────────────── */
-
 .uav-planner-container {
-  max-width: 1400px;
+  max-width: 1380px;
   margin: 0 auto;
-  padding: 24px 28px 72px 28px;
+  padding: 24px 28px 60px 28px;
   position: relative;
   z-index: 2;
 }
 
 .uav-grid-layout {
   display: grid;
-  grid-template-columns: 52px 1fr 340px;
-  gap: 28px;
+  grid-template-columns: 48px 1fr 340px;
+  gap: 24px;
   align-items: start;
 }
 
 @media (max-width: 1200px) {
   .uav-grid-layout {
-    grid-template-columns: 52px 1fr;
+    grid-template-columns: 48px 1fr;
   }
   .uav-preview-panel {
     grid-column: 2 / -1;
@@ -434,252 +684,650 @@ body {
   }
 }
 
-/* Workflow Rail */
 .uav-workflow-rail {
   display: flex;
   flex-direction: column;
   align-items: center;
   position: sticky;
-  top: 90px;
+  top: 84px;
   padding: 12px 0;
 }
 
 .uav-rail-line {
-  width: 2px;
-  height: 440px;
-  background: linear-gradient(180deg, #0284c7 0%, rgba(14, 165, 233, 0.3) 60%, rgba(14, 165, 233, 0.1) 100%);
+  width: 1.5px;
+  height: 420px;
+  background: linear-gradient(180deg, var(--border-strong) 0%, var(--border-subtle) 100%);
   position: absolute;
-  top: 40px;
+  top: 36px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 0;
 }
 
 .uav-rail-node {
-  width: 44px;
-  height: 44px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
-  background: #ffffff;
-  border: 2px solid rgba(14, 165, 233, 0.25);
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-strong);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #64748b;
+  color: var(--text-muted);
   position: relative;
   z-index: 1;
-  margin-bottom: 48px;
-  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  margin-bottom: 44px;
+  box-shadow: var(--shadow-xs);
+  transition: all 0.2s ease;
   cursor: default;
 }
 
 .uav-rail-node.active {
-  background: linear-gradient(135deg, #0284c7, #0ea5e9);
-  border-color: #38bdf8;
+  background: var(--text-primary);
+  border-color: var(--text-primary);
   color: #ffffff;
-  box-shadow: 0 0 0 5px rgba(2, 132, 199, 0.16), 0 4px 14px rgba(2, 132, 199, 0.35);
+  box-shadow: 0 0 0 4px var(--primary-muted);
 }
 
-.uav-rail-node:hover:not(.active) {
-  border-color: #0284c7;
-  color: #0284c7;
-  transform: scale(1.05);
-}
-
-/* Light Field & Input Styles */
 .uav-field-wrapper {
   position: relative;
   display: flex;
   align-items: center;
 }
 
-.uav-input {
-  width: 100%;
-  background: #ffffff;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 11px 16px;
-  font-size: 0.92rem;
-  color: #0f172a;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
-}
-
-.uav-input:focus {
-  outline: none;
-  border-color: #0284c7;
-  box-shadow: 0 0 0 3.5px rgba(2, 132, 199, 0.12), 0 1px 2px rgba(15, 23, 42, 0.04);
-}
-
-.uav-input::placeholder {
-  color: #94a3b8;
-  font-weight: 400;
-}
-
 .uav-unit-badge {
   position: absolute;
-  right: 14px;
+  right: 12px;
   font-family: var(--font-mono);
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 600;
-  color: #94a3b8;
+  color: var(--text-muted);
   pointer-events: none;
-  background: rgba(241, 245, 249, 0.8);
+  background: var(--bg-surface-subtle);
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
 }
 
 .uav-section-num {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  background: rgba(2, 132, 199, 0.08);
-  border: 1.5px solid rgba(2, 132, 199, 0.2);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-subtle);
+  border: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.85rem;
-  font-weight: 800;
-  color: #0284c7;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-primary);
   font-family: var(--font-mono);
 }
 
 .uav-metric-tile {
-  border-radius: 14px;
-  padding: 16px 18px;
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
   display: flex;
   align-items: center;
-  gap: 14px;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  gap: 12px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-xs);
+  transition: transform 0.15s ease, border-color 0.15s ease;
 }
 
 .uav-metric-tile:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06);
+  transform: translateY(-1px);
+  border-color: var(--border-strong);
 }
 
-/* Subtle rotating compass styling */
-.compass-ring {
+/* Micro Animations */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+  animation: spin 1.2s linear infinite;
+}
+
+/* Crisp Technical Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-main);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--radius-xs);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   RECON-X Cinematic Spatial Hero Responsive Styles
+   ────────────────────────────────────────────────────────────────────────── */
+.recon-hero-container {
   position: relative;
-  width: 220px;
-  height: 220px;
-  margin: 12px auto 16px auto;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  margin-bottom: 36px;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-subtle);
+  background: #09121f;
+  min-height: 600px;
+  display: flex;
+  flex-direction: column;
+}
+
+.recon-hero-grid {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 36px;
+  align-items: center;
+  padding: 40px 36px 36px 36px;
+  flex: 1;
+}
+
+.recon-hero-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  max-width: 560px;
+}
+
+.recon-hero-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(248, 250, 252, 0.98) 0%, rgba(248, 250, 252, 0.94) 48%, rgba(248, 250, 252, 0.50) 74%, rgba(248, 250, 252, 0.20) 100%);
+  z-index: 1;
+  pointer-events: none;
+}
+
+@media (max-width: 1024px) {
+  .recon-hero-grid {
+    grid-template-columns: 1fr;
+    gap: 32px;
+    padding: 32px 24px;
+  }
+  .recon-hero-scrim {
+    background: linear-gradient(180deg, rgba(248, 250, 252, 0.98) 0%, rgba(248, 250, 252, 0.93) 55%, rgba(248, 250, 252, 0.85) 100%);
+  }
+}
+
+@media (max-width: 640px) {
+  .recon-hero-container {
+    min-height: auto;
+  }
+  .recon-hero-grid {
+    padding: 24px 16px;
+    gap: 24px;
+  }
+  .recon-hero-meta-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   RECON-X Technical Pipeline Sequence Redesign (Aesthetic & Storytelling)
+   ────────────────────────────────────────────────────────────────────────── */
+.recon-pipeline-section {
+  position: relative;
+  margin-bottom: 48px;
+  background: #ffffff;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 40px 36px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.recon-process-header {
+  margin-bottom: 30px;
+}
+
+.recon-tech-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  background: #f8fafc;
+  border: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #0f766e;
+  letter-spacing: 0.08em;
+  margin-bottom: 12px;
+}
+
+.recon-tech-badge-dot {
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  border: 1.5px dashed rgba(2, 132, 199, 0.35);
+  background: #0f766e;
+}
+
+.recon-process-title {
+  font-size: clamp(1.85rem, 3.4vw, 2.5rem);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+  color: #0f172a;
+  margin: 0 0 10px 0;
+}
+
+.recon-process-title-accent {
+  color: #0f766e;
+}
+
+.recon-process-subtitle {
+  font-size: 0.94rem;
+  color: #475569;
+  max-width: 680px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* 7-Step Visual Progression Stream (Milestones) */
+.recon-milestones-stream {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #f8fafc;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  margin-bottom: 34px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.recon-milestones-stream::-webkit-scrollbar {
+  display: none;
+}
+
+.recon-milestone-node {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.18s ease;
+}
+
+.recon-milestone-node:hover {
+  color: #0f172a;
+  background: rgba(226, 232, 240, 0.6);
+}
+
+.recon-milestone-node.active {
+  color: #0f766e;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.recon-milestone-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  transition: background 0.18s ease;
+}
+
+.recon-milestone-node.active .recon-milestone-dot {
+  background: #0f766e;
+}
+
+.recon-milestone-arrow {
+  color: #cbd5e1;
+  font-size: 0.72rem;
+  padding: 0 2px;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+/* Main Split: Technical Sequence + Inspection Telemetry */
+.recon-pipeline-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(360px, 1fr);
+  gap: 36px;
+  align-items: flex-start;
+}
+
+/* Vertical Technical Sequence (No generic cards) */
+.recon-tech-rail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding-left: 24px;
+}
+
+.recon-tech-line {
+  position: absolute;
+  left: 6px;
+  top: 14px;
+  bottom: 24px;
+  width: 1px;
+  background: #e2e8f0;
+}
+
+.recon-tech-line-progress {
+  position: absolute;
+  top: 0;
+  width: 100%;
+  background: #0f766e;
+  transition: height 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.recon-seq-step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(241, 245, 249, 0.9);
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: 6px;
+  margin-bottom: 2px;
+  border-left: 2px solid transparent;
+}
+
+.recon-seq-step:hover {
+  background: #f8fafc;
+}
+
+.recon-seq-step.active {
+  background: rgba(15, 118, 110, 0.035);
+  border-left-color: #0f766e;
+}
+
+/* Precision Hairline Node along Rail */
+.recon-seq-node {
+  position: absolute;
+  left: -24px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid #94a3b8;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8px;
+  z-index: 2;
+  transition: all 0.2s ease;
 }
 
-.compass-inner-map {
-  width: 194px;
-  height: 194px;
+.recon-seq-step:hover .recon-seq-node {
+  border-color: #0f766e;
+}
+
+.recon-seq-step.active .recon-seq-node {
+  border-color: #0f766e;
+  background: #0f766e;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.15);
+}
+
+.recon-seq-node-inner {
+  width: 3px;
+  height: 3px;
   border-radius: 50%;
-  overflow: hidden;
-  position: relative;
-  box-shadow: 0 4px 16px rgba(2, 132, 199, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+  background: transparent;
+  transition: background 0.2s ease;
 }
 
-.compass-label {
-  position: absolute;
+.recon-seq-step.active .recon-seq-node-inner {
+  background: #ffffff;
+}
+
+.recon-seq-num {
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: 0.82rem;
   font-weight: 800;
-  color: #0284c7;
+  color: #64748b;
+  letter-spacing: 0.04em;
+  transition: color 0.18s ease;
 }
 
-.compass-n { top: -14px; left: 50%; transform: translateX(-50%); }
-.compass-s { bottom: -14px; left: 50%; transform: translateX(-50%); }
-.compass-e { right: -14px; top: 50%; transform: translateY(-50%); }
-.compass-w { left: -14px; top: 50%; transform: translateY(-50%); }
+.recon-seq-step.active .recon-seq-num {
+  color: #0f766e;
+}
 
-/* ==========================================================================
-   Quality Analytics & Telemetry Page - Premium Modern Light Theme
-   ========================================================================== */
-.analytics-dashboard-root {
+.recon-seq-content {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.recon-seq-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.recon-seq-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #1e293b;
+  transition: color 0.18s ease;
+}
+
+.recon-seq-step.active .recon-seq-title {
   color: #0f172a;
 }
 
-.analytics-dashboard-root h1,
-.analytics-dashboard-root h2,
-.analytics-dashboard-root h3,
-.analytics-dashboard-root h4,
-.analytics-dashboard-root h5,
-.analytics-dashboard-root h6 {
-  color: #0f172a !important;
+.recon-seq-epoch {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: #94a3b8;
+  letter-spacing: 0.05em;
 }
 
-.analytics-dashboard-root .glass-panel {
-  background: #ffffff !important;
-  border: 1px solid #e2e8f0 !important;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05), 0 4px 16px rgba(15, 23, 42, 0.03) !important;
-  color: #0f172a !important;
+.recon-seq-step.active .recon-seq-epoch {
+  color: #0f766e;
 }
 
-.analytics-dashboard-root table {
-  color: #0f172a !important;
+.recon-seq-desc {
+  font-size: 0.79rem;
+  color: #475569;
+  line-height: 1.48;
+  margin: 0;
 }
 
-.analytics-dashboard-root th {
-  color: #64748b !important;
-  border-bottom: 1px solid #e2e8f0 !important;
+.recon-seq-spec {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.63rem;
+  color: #64748b;
+  margin-top: 3px;
 }
 
-.analytics-dashboard-root td {
-  border-bottom: 1px solid #f1f5f9 !important;
+/* Micro-visual container */
+.recon-micro-visual {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  color: #64748b;
+  opacity: 0.65;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
-/* Force light card text across diagnostic telemetry metrics */
-.analytics-dashboard-root [style*="color: #fff"],
-.analytics-dashboard-root [style*="color:#fff"],
-.analytics-dashboard-root [style*="color: #f8fafc"],
-.analytics-dashboard-root [style*="color:#f8fafc"],
-.analytics-dashboard-root [style*="color: #e2e8f0"],
-.analytics-dashboard-root [style*="color:#e2e8f0"] {
-  color: #0f172a !important;
+.recon-seq-step:hover .recon-micro-visual {
+  opacity: 0.9;
+  color: #334155;
 }
 
-/* Fix dark background containers inside analytics tabs to light cards */
-.analytics-dashboard-root div[style*="background: 'rgba(15,23,42"],
-.analytics-dashboard-root div[style*="background: rgba(15, 23, 42"],
-.analytics-dashboard-root div[style*="background: 'rgba(15, 23, 42"],
-.analytics-dashboard-root div[style*="background: 'rgba(0,0,0,0.3)"],
-.analytics-dashboard-root div[style*="background: rgba(0, 0, 0, 0.3)"],
-.analytics-dashboard-root div[style*="background: 'rgba(0,0,0,0.2)"],
-.analytics-dashboard-root div[style*="background: rgba(0, 0, 0, 0.2)"],
-.analytics-dashboard-root div[style*="background: 'linear-gradient(145deg, rgba(30,27,75"] {
-  background: #ffffff !important;
-  border: 1px solid #e2e8f0 !important;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04) !important;
+.recon-seq-step.active .recon-micro-visual {
+  opacity: 1;
+  color: #0f766e;
 }
 
-/* Light theme for tables and sub-rows */
-.analytics-dashboard-root tr[style*="borderBottom"] {
-  border-bottom-color: #e2e8f0 !important;
+/* Right Side Technical Storytelling Inspector */
+.recon-tech-inspector {
+  position: sticky;
+  top: 80px;
+  background: #ffffff;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
 }
 
-.analytics-dashboard-root [style*="borderTop: '1px solid rgba(255,255,255"],
-.analytics-dashboard-root [style*="border-top: 1px solid rgba(255, 255, 255"] {
-  border-top-color: #e2e8f0 !important;
+.recon-inspector-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
-.analytics-dashboard-root [style*="borderBottom: '1px solid rgba(255,255,255"],
-.analytics-dashboard-root [style*="border-bottom: 1px solid rgba(255, 255, 255"] {
-  border-bottom-color: #e2e8f0 !important;
+.recon-viewport-card {
+  position: relative;
+  height: 224px;
+  border-radius: 8px;
+  background: #09121f;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  margin-bottom: 16px;
 }
 
-.analytics-dashboard-root [style*="border: '1px solid rgba(255,255,255"],
-.analytics-dashboard-root [style*="border: 1px solid rgba(255, 255, 255"] {
-  border-color: #e2e8f0 !important;
+.recon-viewport-hud-top {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 2;
+  pointer-events: none;
 }
 
-/* Modal backdrop in analytics */
-.analytics-dashboard-root div[style*="position: 'fixed'"][style*="background: 'rgba(0,0,0,0.85)'"],
-.analytics-dashboard-root div[style*="position: fixed"][style*="background: rgba(0, 0, 0, 0.85)"] {
-  background: rgba(15, 23, 42, 0.45) !important;
-  backdrop-filter: blur(8px) !important;
+.recon-hud-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(9, 18, 31, 0.82);
+  backdrop-filter: blur(4px);
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: #f8fafc;
+  letter-spacing: 0.04em;
+}
+
+.recon-viewport-hud-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(9, 18, 31, 0.88);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 6px 12px;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  color: #94a3b8;
+  z-index: 2;
+}
+
+.recon-formula-box {
+  background: #f8fafc;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+
+.recon-telemetry-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.recon-telemetry-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.74rem;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(241, 245, 249, 0.9);
+}
+
+.recon-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle);
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.recon-nav-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+@media (max-width: 1024px) {
+  .recon-pipeline-grid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .recon-tech-inspector {
+    position: static;
+  }
+}
+
+@media (max-width: 640px) {
+  .recon-pipeline-section {
+    padding: 24px 16px;
+  }
+  .recon-tech-rail {
+    padding-left: 18px;
+  }
+  .recon-seq-node {
+    left: -18px;
+  }
+  .recon-seq-step {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+  .recon-micro-visual {
+    display: none;
+  }
 }
 
 

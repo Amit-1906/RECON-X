@@ -45,28 +45,71 @@ def read_point_cloud_with_confidence(
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Reads 3D Cartesian coordinates, RGB colors, and confidence values from a PLY point cloud.
-    
-    Supports:
-      - Embedded confidence properties ('confidence', 'quality', 'intensity', 'scalar_confidence')
-      - Companion confidence maps or metrics if PLY does not store scalar confidence
-      - Local density-based fallback confidence
-      
+    Optimized v2: Supports both ASCII and binary little-endian PLY parsing.
     Returns:
-      points: (N, 3) float32 in original spatial coordinates
-      colors: (N, 3) uint8 RGB [0, 255]
-      confidences: (N,) float32 normalized [0.0, 1.0]
+      points: (N, 3) float32
+      colors: (N, 3) uint8
+      confidences: (N,) float32
     """
     if not ply_path.exists():
         raise FileNotFoundError(f"Point cloud file not found: {ply_path}")
 
+    with open(ply_path, "rb") as f:
+        header = []
+        is_binary = False
+        num_vertices = 0
+        
+        while True:
+            line = f.readline().decode('ascii', errors='ignore').strip()
+            header.append(line)
+            if line.startswith("format binary_little_endian"):
+                is_binary = True
+            elif line.startswith("element vertex"):
+                num_vertices = int(line.split()[-1])
+            elif line == "end_header":
+                break
+                
+        if num_vertices == 0:
+            return np.empty((0, 3), dtype=np.float32), np.empty((0, 3), dtype=np.uint8), np.empty((0,), dtype=np.float32)
+
+        if is_binary:
+            # Assume strict format from our writer: float32(x,y,z), uint8(r,g,b), optionally float32(nx,ny,nz), float32(conf)
+            # Find properties to determine struct format
+            props = [h.split() for h in header if h.startswith("property")]
+            dtype_list = []
+            for p in props:
+                ptype, pname = p[1], p[2]
+                if ptype == "float": dtype_list.append((pname, np.float32))
+                elif ptype == "uchar": dtype_list.append((pname, np.uint8))
+            
+            dt = np.dtype(dtype_list)
+            data = np.frombuffer(f.read(), dtype=dt, count=num_vertices)
+            
+            points = np.vstack([data['x'], data['y'], data['z']]).T.astype(np.float32)
+            if 'red' in data.dtype.names:
+                colors = np.vstack([data['red'], data['green'], data['blue']]).T.astype(np.uint8)
+            elif 'r' in data.dtype.names:
+                colors = np.vstack([data['r'], data['g'], data['b']]).T.astype(np.uint8)
+            else:
+                colors = np.full((num_vertices, 3), 200, dtype=np.uint8)
+                
+            if 'confidence' in data.dtype.names:
+                confs = data['confidence'].astype(np.float32)
+            elif 'quality' in data.dtype.names:
+                confs = data['quality'].astype(np.float32)
+            else:
+                confs = np.ones(num_vertices, dtype=np.float32)
+                
+            return points, colors, confs
+
+    # Fallback to ASCII reading if not binary
     points: List[List[float]] = []
     colors: List[List[int]] = []
     confs: List[float] = []
 
-    has_conf_prop = False
-    conf_prop_idx = -1
     x_idx, y_idx, z_idx = 0, 1, 2
     r_idx, g_idx, b_idx = 3, 4, 5
+    has_conf_prop, conf_prop_idx = False, -1
 
     with open(ply_path, "r", encoding="utf-8", errors="ignore") as f:
         in_header = True
@@ -78,18 +121,12 @@ def read_point_cloud_with_confidence(
                 if line_str.startswith("property"):
                     parts = line_str.split()
                     prop_name = parts[-1].lower()
-                    if prop_name == "x":
-                        x_idx = prop_idx
-                    elif prop_name == "y":
-                        y_idx = prop_idx
-                    elif prop_name == "z":
-                        z_idx = prop_idx
-                    elif prop_name in ("red", "r"):
-                        r_idx = prop_idx
-                    elif prop_name in ("green", "g"):
-                        g_idx = prop_idx
-                    elif prop_name in ("blue", "b"):
-                        b_idx = prop_idx
+                    if prop_name == "x": x_idx = prop_idx
+                    elif prop_name == "y": y_idx = prop_idx
+                    elif prop_name == "z": z_idx = prop_idx
+                    elif prop_name in ("red", "r"): r_idx = prop_idx
+                    elif prop_name in ("green", "g"): g_idx = prop_idx
+                    elif prop_name in ("blue", "b"): b_idx = prop_idx
                     elif prop_name in ("confidence", "quality", "intensity", "conf", "scalar_confidence"):
                         has_conf_prop = True
                         conf_prop_idx = prop_idx
@@ -109,77 +146,27 @@ def read_point_cloud_with_confidence(
             px, py, pz = float(tokens[x_idx]), float(tokens[y_idx]), float(tokens[z_idx])
             points.append([px, py, pz])
 
-            # Color extraction
             if len(tokens) > max(r_idx, g_idx, b_idx):
                 try:
-                    cr = int(float(tokens[r_idx]))
-                    cg = int(float(tokens[g_idx]))
-                    cb = int(float(tokens[b_idx]))
-                    colors.append([cr, cg, cb])
+                    colors.append([int(float(tokens[r_idx])), int(float(tokens[g_idx])), int(float(tokens[b_idx]))])
                 except Exception:
                     colors.append([200, 200, 200])
             else:
                 colors.append([200, 200, 200])
 
-            # Embedded confidence extraction
             if has_conf_prop and len(tokens) > conf_prop_idx:
                 try:
-                    c_val = float(tokens[conf_prop_idx])
-                    confs.append(c_val)
+                    confs.append(float(tokens[conf_prop_idx]))
                 except Exception:
-                    confs.append(0.75)
+                    confs.append(1.0)
             else:
-                confs.append(0.75)
+                confs.append(1.0)
 
     pts_arr = np.array(points, dtype=np.float32)
     clr_arr = np.array(colors, dtype=np.uint8)
     cnf_arr = np.array(confs, dtype=np.float32)
-
-    if len(pts_arr) == 0:
-        return np.empty((0, 3), dtype=np.float32), np.empty((0, 3), dtype=np.uint8), np.empty((0,), dtype=np.float32)
-
-    # If confidence was not embedded in PLY, check companion files or compute geometric confidence
-    if not has_conf_prop:
-        companion_loaded = False
-        # 1. Check for dense_confidence.npy or dense_point_confidence.npy
-        for cand_name in ["dense_confidence.npy", "dense_point_confidence.npy", "confidences.npy"]:
-            cand_path = ply_path.parent / cand_name
-            if cand_path.exists():
-                try:
-                    arr = np.load(cand_path)
-                    if len(arr) == len(pts_arr):
-                        cnf_arr = arr.astype(np.float32)
-                        companion_loaded = True
-                        break
-                except Exception:
-                    pass
-
-        # 2. Check dense_metrics.json for global mean confidence baseline
-        if not companion_loaded and companion_metrics_path and companion_metrics_path.exists():
-            try:
-                with open(companion_metrics_path, "r", encoding="utf-8") as f:
-                    m_data = json.load(f)
-                    base_mean = float(m_data.get("depth_confidence", {}).get("mean", 0.75))
-                    cnf_arr = np.full(len(pts_arr), base_mean, dtype=np.float32)
-                    companion_loaded = True
-            except Exception:
-                pass
-
-        # 3. Geometric point density confidence heuristic
-        if not companion_loaded and len(pts_arr) > 10:
-            tree = cKDTree(pts_arr)
-            # Sample k-NN distances to modulate confidence: tightly clustered points have higher confidence
-            k_val = min(12, len(pts_arr))
-            dists, _ = tree.query(pts_arr, k=k_val)
-            mean_nn_dist = np.mean(dists[:, 1:], axis=1)  # exclude distance to self
-            median_dist = np.median(mean_nn_dist)
-            if median_dist > 1e-6:
-                norm_density = np.clip(1.0 - (mean_nn_dist / (3.0 * median_dist)), 0.2, 0.95)
-                cnf_arr = norm_density.astype(np.float32)
-
-    # Ensure confidences strictly in [0.0, 1.0]
-    cnf_arr = np.clip(cnf_arr, 0.0, 1.0)
     return pts_arr, clr_arr, cnf_arr
+
 
 
 def filter_points_and_confidence(

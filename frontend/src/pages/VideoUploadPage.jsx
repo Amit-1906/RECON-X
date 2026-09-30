@@ -312,11 +312,21 @@ export default function VideoUploadPage({
           {/* Left Title & Subtitle */}
           <div style={{ maxWidth: '640px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-              <span className="telemetry-chip">
-                PHASE 1 OF 7
+              <span style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: '0.62rem',
+                fontWeight: 800,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                background: '#0f172a',
+                color: '#ffffff',
+                padding: '2px 6px',
+                borderRadius: '3px'
+              }}>
+                RECON-X
               </span>
-              <span className="telemetry-chip" style={{ color: '#0d9488', borderColor: 'rgba(13, 148, 136, 0.25)', background: 'rgba(13, 148, 136, 0.08)' }}>
-                UAV INGESTION ENGINE
+              <span className="telemetry-chip" style={{ color: '#0284c7', borderColor: 'rgba(2, 132, 199, 0.25)', background: 'rgba(2, 132, 199, 0.08)' }}>
+                INPUT &amp; INGESTION ENGINE
               </span>
             </div>
 
@@ -328,11 +338,11 @@ export default function VideoUploadPage({
               lineHeight: 1.18,
               margin: 0
             }}>
-              Video Ingestion &amp; <span style={{ color: '#0284c7' }}>Frame Extraction</span>
+              MISSION <span style={{ color: '#0284c7' }}>CONSOLE</span>
             </h1>
 
             <p style={{ fontSize: '0.94rem', color: '#64748b', marginTop: '8px', lineHeight: 1.5, margin: '8px 0 0 0' }}>
-              Phase 1 — Upload your drone footage, inspect video metadata, and extract keyframes at a configurable interval.
+              High-Precision UAV Ingestion &amp; Keyframe Processing — Ingest aerial footage, verify sensor telemetry, and extract keyframe sequences.
             </p>
           </div>
 
@@ -417,7 +427,7 @@ export default function VideoUploadPage({
                 letterSpacing: '-0.01em',
                 margin: 0
               }}>
-                Select Mission &amp; Upload Flight Video
+                MISSION &amp; INPUT: Select Mission &amp; Upload Footage
               </h2>
               <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '3px', margin: '3px 0 0 0' }}>
                 Choose the target survey mission and ingest the raw aerial footage for frame extraction.
@@ -567,7 +577,7 @@ export default function VideoUploadPage({
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <Film size={20} color="#0284c7" />
                 <h2 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-                  Video Telemetry &amp; Codec Profile
+                  INPUT: Video Telemetry &amp; Codec Profile
                 </h2>
               </div>
               <StatusBadge status={ingestionStatus} />
@@ -607,7 +617,7 @@ export default function VideoUploadPage({
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
               <Sliders size={20} color="#0284c7" />
               <h2 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-                Configure Frame Extraction
+                PROCESSING: Configure Frame Extraction
               </h2>
             </div>
 
@@ -713,7 +723,7 @@ export default function VideoUploadPage({
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <Cpu size={20} color="#0284c7" />
                 <h2 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-                  Processing &amp; Keyframe Ingestion Pipeline
+                  OUTPUT: Keyframe Extraction Pipeline
                 </h2>
               </div>
               <StatusBadge status={ingestionStatus} />

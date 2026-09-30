@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { 
   Activity, 
   Play, 
@@ -18,11 +18,248 @@ import {
   Zap,
   Sparkles,
   ArrowRight,
-  Upload
+  Upload,
+  Video,
+  FileText,
+  Sliders,
+  ChevronDown,
+  ChevronRight,
+  Download,
+  ExternalLink,
+  Shield,
+  Plane,
+  Camera,
+  Compass,
+  AlertTriangle,
+  RotateCw
 } from 'lucide-react';
 import { apiClient } from '../api/client';
 import StatusBadge from '../components/StatusBadge';
 import StagePipelineView from '../components/StagePipelineView';
+
+// ─── TECHNICAL DESIGN TOKENS (Light High-End Engineering Console) ────────────
+const CONSOLE_MONO = "'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace";
+
+const STYLES = {
+  container: {
+    minHeight: 'calc(100vh - 60px)',
+    background: '#f8fafc',
+    color: '#0f172a',
+    padding: '24px 32px 64px 32px',
+    position: 'relative',
+    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+  },
+  header: {
+    background: '#ffffff',
+    border: '1px solid #e2e8f0',
+    borderRadius: '10px',
+    padding: '16px 24px',
+    marginBottom: '20px',
+    boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '16px'
+  },
+  sectionCard: {
+    background: '#ffffff',
+    border: '1px solid #e2e8f0',
+    borderRadius: '10px',
+    boxShadow: '0 1px 3px rgba(15, 23, 42, 0.03)',
+    overflow: 'hidden',
+    marginBottom: '20px'
+  },
+  sectionHeader: {
+    padding: '12px 18px',
+    background: '#f8fafc',
+    borderBottom: '1px solid #e2e8f0',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  sectionTitle: {
+    fontFamily: CONSOLE_MONO,
+    fontSize: '0.68rem',
+    fontWeight: 800,
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase',
+    color: '#0284c7',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px'
+  },
+  sectionBody: {
+    padding: '18px 20px'
+  },
+  dataGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+    gap: '10px'
+  },
+  dataCell: {
+    background: '#f8fafc',
+    border: '1px solid #e2e8f0',
+    borderRadius: '6px',
+    padding: '8px 12px'
+  },
+  cellLabel: {
+    fontFamily: CONSOLE_MONO,
+    fontSize: '0.58rem',
+    fontWeight: 700,
+    color: '#64748b',
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    marginBottom: '3px'
+  },
+  cellValue: {
+    fontFamily: CONSOLE_MONO,
+    fontSize: '0.82rem',
+    fontWeight: 700,
+    color: '#0f172a',
+    lineHeight: 1.2
+  }
+};
+
+// ─── 9 USER-SPECIFIED RECONSTRUCTION PIPELINE STAGES ─────────────────────────
+const VERTICAL_STAGES = [
+  {
+    id: 'video_ingest',
+    label: 'VIDEO INGEST',
+    desc: 'Footage and flight telemetry ingested into workspace',
+    resolveStatus: (job, mission, stages) => {
+      if (job || mission?.video_filename || mission?.video_path) return 'completed';
+      return 'pending';
+    }
+  },
+  {
+    id: 'frame_extraction',
+    label: 'FRAME EXTRACTION',
+    desc: 'Adaptive keyframe extraction & color normalization',
+    resolveStatus: (job, mission, stages) => {
+      if (!job) {
+        if (mission?.ingestion_status === 'COMPLETED') return 'completed';
+        if (mission?.ingestion_status === 'EXTRACTING') return 'running';
+        return 'pending';
+      }
+      const stg = stages.find(s => s.stage_name === 'preprocessing');
+      if (stg?.status === 'completed') return 'completed';
+      if (stg?.status === 'running' || job.current_stage === 'preprocessing') return 'running';
+      if (stg?.status === 'failed') return 'failed';
+      // If subsequent stages are running/completed, this is completed
+      const subsequent = stages.some(s => s.stage_order > 1 && (s.status === 'completed' || s.status === 'running'));
+      return subsequent ? 'completed' : 'pending';
+    },
+    getMetric: (metrics) => metrics.frames_extracted ? `${metrics.frames_extracted.toLocaleString()} frames` : null
+  },
+  {
+    id: 'feature_matching',
+    label: 'FEATURE MATCHING',
+    desc: 'SIFT/ORB feature detection, correspondence & keyframe selection',
+    resolveStatus: (job, mission, stages) => {
+      if (!job) return 'pending';
+      const stg = stages.find(s => s.stage_name === 'keyframe_selection');
+      if (stg?.status === 'completed') return 'completed';
+      if (stg?.status === 'running' || job.current_stage === 'keyframe_selection') return 'running';
+      if (stg?.status === 'failed') return 'failed';
+      const subsequent = stages.some(s => s.stage_order > 5 && (s.status === 'completed' || s.status === 'running'));
+      return subsequent ? 'completed' : 'pending';
+    },
+    getMetric: (metrics) => metrics.keyframes_selected ? `${metrics.keyframes_selected} keyframes` : null
+  },
+  {
+    id: 'camera_pose',
+    label: 'CAMERA POSE',
+    desc: 'Epipolar RANSAC & camera trajectory recovery (Structure-from-Motion)',
+    resolveStatus: (job, mission, stages) => {
+      if (!job) return 'pending';
+      const stgGeom = stages.find(s => s.stage_name === 'geometry');
+      const stgPose = stages.find(s => s.stage_name === 'pose_estimation');
+      if (stgGeom?.status === 'completed') return 'completed';
+      if (stgPose?.status === 'running' || stgGeom?.status === 'running' || job.current_stage === 'pose_estimation' || job.current_stage === 'geometry') return 'running';
+      if (stgPose?.status === 'failed' || stgGeom?.status === 'failed') return 'failed';
+      const subsequent = stages.some(s => s.stage_order > 7 && (s.status === 'completed' || s.status === 'running'));
+      return subsequent ? 'completed' : 'pending';
+    },
+    getMetric: (metrics) => metrics.cameras_registered ? `${metrics.cameras_registered} cameras` : null
+  },
+  {
+    id: 'depth_estimation',
+    label: 'DEPTH ESTIMATION',
+    desc: 'Multi-view Semi-Global stereo disparity depth maps',
+    resolveStatus: (job, mission, stages) => {
+      if (!job) return 'pending';
+      const stg = stages.find(s => s.stage_name === 'dense_point_cloud');
+      if (stg?.status === 'completed') return 'completed';
+      if (stg?.status === 'running' || job.current_stage === 'dense_point_cloud') return 'running';
+      if (stg?.status === 'failed') return 'failed';
+      const subsequent = stages.some(s => s.stage_order > 8 && (s.status === 'completed' || s.status === 'running'));
+      return subsequent ? 'completed' : 'pending';
+    }
+  },
+  {
+    id: 'point_cloud',
+    label: 'POINT CLOUD',
+    desc: 'Dense 3D point cloud triangulation with spatial filtering',
+    resolveStatus: (job, mission, stages) => {
+      if (!job) return 'pending';
+      const stg = stages.find(s => s.stage_name === 'dense_point_cloud');
+      if (stg?.status === 'completed') return 'completed';
+      if (stg?.status === 'running' || job.current_stage === 'dense_point_cloud') return 'running';
+      if (stg?.status === 'failed') return 'failed';
+      const subsequent = stages.some(s => s.stage_order > 8 && (s.status === 'completed' || s.status === 'running'));
+      return subsequent ? 'completed' : 'pending';
+    },
+    getMetric: (metrics) => metrics.dense_points ? `${metrics.dense_points.toLocaleString()} pts` : null
+  },
+  {
+    id: 'mesh',
+    label: 'MESH',
+    desc: 'Watertight surface mesh generation & Delaunay triangulation',
+    resolveStatus: (job, mission, stages) => {
+      if (!job) return 'pending';
+      const stg = stages.find(s => s.stage_name === 'mesh_generation');
+      if (stg?.status === 'completed') return 'completed';
+      if (stg?.status === 'running' || job.current_stage === 'mesh_generation') return 'running';
+      if (stg?.status === 'failed') return 'failed';
+      const subsequent = stages.some(s => s.stage_order > 9 && (s.status === 'completed' || s.status === 'running'));
+      return subsequent ? 'completed' : 'pending';
+    },
+    getMetric: (metrics) => metrics.triangles ? `${metrics.triangles.toLocaleString()} tris` : null
+  },
+  {
+    id: 'texture',
+    label: 'TEXTURE',
+    desc: 'Projective UV texture mapping and multi-view seam blending',
+    resolveStatus: (job, mission, stages) => {
+      if (!job) return 'pending';
+      const stg = stages.find(s => s.stage_name === 'texture_mapping');
+      if (stg?.status === 'completed') return 'completed';
+      if (stg?.status === 'running' || job.current_stage === 'texture_mapping') return 'running';
+      if (stg?.status === 'failed') return 'failed';
+      const subsequent = stages.some(s => s.stage_order > 10 && (s.status === 'completed' || s.status === 'running'));
+      return subsequent ? 'completed' : 'pending';
+    }
+  },
+  {
+    id: 'digital_twin',
+    label: 'DIGITAL TWIN',
+    desc: 'Georeferencing, uncertainty estimation & certified photogrammetry report',
+    resolveStatus: (job, mission, stages) => {
+      if (!job) return 'pending';
+      if (job.status === 'completed') return 'completed';
+      const stgVal = stages.find(s => s.stage_name === 'validation');
+      const stgConf = stages.find(s => s.stage_name === 'confidence_estimation');
+      const stgGeo = stages.find(s => s.stage_name === 'georeferencing');
+      if (stgVal?.status === 'completed') return 'completed';
+      if (job.current_stage === 'validation' || job.current_stage === 'confidence_estimation' || job.current_stage === 'georeferencing') return 'running';
+      if (stgGeo?.status === 'running' || stgConf?.status === 'running' || stgVal?.status === 'running') return 'running';
+      if (job.status === 'failed') return 'failed';
+      return 'pending';
+    },
+    getMetric: (metrics) => metrics.confidence_high_pct !== null && metrics.confidence_high_pct !== undefined ? `${metrics.confidence_high_pct}% confidence` : null
+  }
+];
 
 export default function ProcessingDashboard({ 
   activeJobId, 
@@ -31,14 +268,41 @@ export default function ProcessingDashboard({
   setActivePage 
 }) {
   const [job, setJob] = useState(null);
+  const [missions, setMissions] = useState([]);
+  const [selectedMission, setSelectedMission] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [resuming, setResuming] = useState(false);
+  const [launching, setLaunching] = useState(false);
   const [elapsedSec, setElapsedSec] = useState(0);
   const [systemStatus, setSystemStatus] = useState(null);
+  const [showStageDetails, setShowStageDetails] = useState(false);
+
+  // Upload & Extraction states inside console
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploading, setUploading] = useState(false);
+  const [extracting, setExtracting] = useState(false);
+  const fileInputRef = useRef(null);
+
   const pollIntervalRef = useRef(null);
 
-  const fetchJobStatus = async () => {
+  // ── Load available missions ────────────────────────────────────────────────
+  useEffect(() => {
+    apiClient.listMissions()
+      .then(list => {
+        setMissions(list);
+        if (activeMissionId) {
+          const m = list.find(x => x.id === activeMissionId) || list[0];
+          setSelectedMission(m);
+        } else if (list.length > 0) {
+          setSelectedMission(list[0]);
+        }
+      })
+      .catch(err => console.debug('Could not fetch missions', err));
+  }, [activeMissionId]);
+
+  // ── Fetch active job status ────────────────────────────────────────────────
+  const fetchJobStatus = useCallback(async () => {
     if (!activeJobId) {
       if (activeMissionId) {
         try {
@@ -63,9 +327,14 @@ export default function ProcessingDashboard({
       if (data.system_status) {
         setSystemStatus(data.system_status);
       }
+      if (data.mission_id && (!selectedMission || selectedMission.id !== data.mission_id)) {
+        apiClient.getMission(data.mission_id)
+          .then(m => setSelectedMission(m))
+          .catch(() => {});
+      }
       setLoading(false);
 
-      if (data.status === 'completed' || data.status === 'failed') {
+      if (data.status === 'completed' || data.status === 'failed' || data.status === 'cancelled') {
         if (pollIntervalRef.current) {
           clearInterval(pollIntervalRef.current);
           pollIntervalRef.current = null;
@@ -75,9 +344,9 @@ export default function ProcessingDashboard({
       setError(err.message || 'Failed to poll job status');
       setLoading(false);
     }
-  };
+  }, [activeJobId, activeMissionId, selectedMission, setActiveJobId]);
 
-  // Poll job status every 2 seconds
+  // ── Poll loop ──────────────────────────────────────────────────────────────
   useEffect(() => {
     fetchJobStatus();
     pollIntervalRef.current = setInterval(fetchJobStatus, 2000);
@@ -85,9 +354,9 @@ export default function ProcessingDashboard({
     return () => {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     };
-  }, [activeJobId, activeMissionId]);
+  }, [fetchJobStatus]);
 
-  // Live timer counting elapsed seconds
+  // ── Live elapsed timer ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!job?.started_at) return;
     const startMs = new Date(job.started_at).getTime();
@@ -107,9 +376,11 @@ export default function ProcessingDashboard({
     return () => clearInterval(timerInterval);
   }, [job?.started_at, job?.completed_at]);
 
+  // ── Actions ────────────────────────────────────────────────────────────────
   const handleResumeStage = async (stageName) => {
     if (!job) return;
     setResuming(true);
+    setError(null);
     try {
       const resumedJob = await apiClient.resumeJob(job.id, stageName);
       setJob(resumedJob);
@@ -133,743 +404,985 @@ export default function ProcessingDashboard({
     }
   };
 
+  const handleLaunchJob = async () => {
+    if (!selectedMission?.id) return;
+    setLaunching(true);
+    setError(null);
+    try {
+      const newJob = await apiClient.createJob(selectedMission.id, 'auto');
+      setActiveJobId(newJob.id);
+      setJob(newJob);
+      setLaunching(false);
+      if (!pollIntervalRef.current) {
+        pollIntervalRef.current = setInterval(fetchJobStatus, 2000);
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to launch reconstruction job');
+      setLaunching(false);
+    }
+  };
+
+  const handleVideoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedMission?.id) return;
+    setUploading(true);
+    setUploadProgress(0);
+    setError(null);
+
+    try {
+      const updated = await apiClient.uploadMissionVideo(selectedMission.id, file, pct => setUploadProgress(pct));
+      setSelectedMission(updated);
+      setUploading(false);
+    } catch (err) {
+      setError(err.message || 'Upload failed');
+      setUploading(false);
+    }
+    e.target.value = '';
+  };
+
+  const handleExtractFrames = async () => {
+    if (!selectedMission?.id) return;
+    setExtracting(true);
+    setError(null);
+    try {
+      await apiClient.extractFrames(selectedMission.id, { intervalSec: 0.5, maxDimension: 1920, jpegQuality: 90 });
+      // Poll mission status
+      const pollTimer = setInterval(async () => {
+        try {
+          const st = await apiClient.getMissionStatus(selectedMission.id);
+          setSelectedMission(prev => ({ ...prev, ...st }));
+          if (st.ingestion_status === 'COMPLETED' || st.ingestion_status === 'FAILED') {
+            clearInterval(pollTimer);
+            setExtracting(false);
+          }
+        } catch {
+          clearInterval(pollTimer);
+          setExtracting(false);
+        }
+      }, 1500);
+    } catch (err) {
+      setError(err.message || 'Extraction failed');
+      setExtracting(false);
+    }
+  };
+
   const formatTime = (totalSec) => {
-    const m = Math.floor(totalSec / 60);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
     const s = totalSec % 60;
+    if (h > 0) {
+      return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  if (loading) {
-    return (
-      <div className="geospatial-canvas" style={{ minHeight: 'calc(100vh - 120px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', position: 'relative' }}>
-        <div className="topographic-overlay" />
-        <div className="geo-card" style={{ padding: '36px 48px', textAlign: 'center', position: 'relative', zIndex: 2, background: 'rgba(255, 255, 255, 0.92)', borderRadius: '18px' }}>
-          <RefreshCw size={32} color="#0284c7" className="animate-spin" style={{ margin: '0 auto 16px auto' }} />
-          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0f172a', marginBottom: '6px' }}>
-            Connecting to Reconstruction Node
-          </h3>
-          <p style={{ fontSize: '0.86rem', color: '#64748b', margin: 0 }}>
-            Querying active photogrammetry telemetry and worker state...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!job) {
-    return (
-      <div className="geospatial-canvas" style={{ minHeight: 'calc(100vh - 120px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 24px 72px 24px', position: 'relative', overflow: 'hidden' }}>
-        <div className="topographic-overlay" />
-        
-        {/* Subtle background geospatial scanning line */}
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: '2px',
-          background: 'linear-gradient(90deg, transparent, rgba(2, 132, 199, 0.4), transparent)',
-          animation: 'scanSweepBg 8s ease-in-out infinite',
-          pointerEvents: 'none',
-          zIndex: 1
-        }} />
-
-        {/* ── Main Workstation Card ── */}
-        <div 
-          className="geo-card" 
-          style={{
-            maxWidth: '780px',
-            width: '100%',
-            padding: '48px 42px',
-            textAlign: 'center',
-            position: 'relative',
-            zIndex: 2,
-            background: 'rgba(255, 255, 255, 0.90)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            borderRadius: '24px',
-            border: '1.5px solid rgba(14, 165, 233, 0.22)',
-            boxShadow: '0 16px 48px -12px rgba(2, 132, 199, 0.08), 0 4px 20px -2px rgba(15, 23, 42, 0.04)'
-          }}
-        >
-          {/* Top Status & Telemetry HUD Chips */}
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '22px', flexWrap: 'wrap' }}>
-            <span className="telemetry-chip">
-              PHOTOGRAMMETRIC PIPELINE ENGINE
-            </span>
-            <span className="telemetry-chip" style={{ color: '#0d9488', borderColor: 'rgba(13, 148, 136, 0.25)', background: 'rgba(13, 148, 136, 0.08)' }}>
-              STAGE STATUS: STANDBY
-            </span>
-          </div>
-
-          {/* ── 3D Photogrammetry Empty State Visual ── */}
-          <div style={{
-            position: 'relative',
-            maxWidth: '540px',
-            margin: '0 auto',
-            padding: '16px',
-            background: 'linear-gradient(180deg, rgba(240, 249, 255, 0.6) 0%, rgba(224, 242, 254, 0.25) 100%)',
-            borderRadius: '16px',
-            border: '1px solid rgba(14, 165, 233, 0.18)',
-            overflow: 'hidden'
-          }}>
-            <svg 
-              viewBox="0 0 520 200" 
-              style={{ width: '100%', height: 'auto', display: 'block', overflow: 'visible' }}
-            >
-              <defs>
-                {/* Scanning Laser Gradient */}
-                <linearGradient id="laserGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="transparent" />
-                  <stop offset="50%" stopColor="#0284c7" stopOpacity="0.8" />
-                  <stop offset="100%" stopColor="transparent" />
-                </linearGradient>
-
-                {/* Frustum Ray Gradient */}
-                <linearGradient id="frustumRay" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="#0284c7" stopOpacity="0.4" />
-                  <stop offset="100%" stopColor="#0d9488" stopOpacity="0.05" />
-                </linearGradient>
-
-                {/* Surface Fill Gradient */}
-                <linearGradient id="terrainSurface" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="rgba(2, 132, 199, 0.12)" />
-                  <stop offset="100%" stopColor="rgba(13, 148, 136, 0.03)" />
-                </linearGradient>
-              </defs>
-
-              {/* Faint Background Coordinate Grid */}
-              <g stroke="rgba(2, 132, 199, 0.1)" strokeWidth="0.75" strokeDasharray="3,4">
-                <line x1="40" y1="20" x2="480" y2="20" />
-                <line x1="40" y1="60" x2="480" y2="60" />
-                <line x1="40" y1="100" x2="480" y2="100" />
-                <line x1="40" y1="140" x2="480" y2="140" />
-                <line x1="40" y1="180" x2="480" y2="180" />
-                <line x1="100" y1="20" x2="100" y2="190" />
-                <line x1="200" y1="20" x2="200" y2="190" />
-                <line x1="320" y1="20" x2="320" y2="190" />
-                <line x1="420" y1="20" x2="420" y2="190" />
-              </g>
-
-              {/* 1. Drone Flight Path (Dashed spline curve) */}
-              <path 
-                d="M 50,45 C 130,20 200,60 260,35 C 320,15 390,50 470,30" 
-                fill="none" 
-                stroke="#0284c7" 
-                strokeWidth="1.8" 
-                strokeDasharray="6,4"
-                style={{ animation: 'pathDash 6s linear infinite' }}
-              />
-
-              {/* Flight Path Waypoint Nodes */}
-              <circle cx="110" cy="30" r="3.5" fill="#ffffff" stroke="#0284c7" strokeWidth="1.5" />
-              <circle cx="390" cy="38" r="3.5" fill="#ffffff" stroke="#0284c7" strokeWidth="1.5" />
-
-              {/* 2. Drone Surveying Position & Frustum Beams */}
-              <g style={{ animation: 'droneHover 4s ease-in-out infinite' }}>
-                {/* Optical Camera Frustum Scanning Rays */}
-                <polygon 
-                  points="260,35 150,150 370,150" 
-                  fill="url(#frustumRay)" 
-                  stroke="rgba(2, 132, 199, 0.22)" 
-                  strokeWidth="0.8"
-                />
-
-                {/* Drone Glyph */}
-                <circle cx="260" cy="35" r="7" fill="#0284c7" />
-                <circle cx="260" cy="35" r="14" fill="none" stroke="#0284c7" strokeWidth="1" strokeDasharray="3,3" />
-                {/* Rotor Arms */}
-                <line x1="244" y1="23" x2="276" y2="47" stroke="#0369a1" strokeWidth="1.8" strokeLinecap="round" />
-                <line x1="244" y1="47" x2="276" y2="23" stroke="#0369a1" strokeWidth="1.8" strokeLinecap="round" />
-                {/* Rotors */}
-                <ellipse cx="244" cy="23" rx="6" ry="2" fill="none" stroke="#38bdf8" strokeWidth="1" />
-                <ellipse cx="276" cy="47" rx="6" ry="2" fill="none" stroke="#38bdf8" strokeWidth="1" />
-                <ellipse cx="244" cy="47" rx="6" ry="2" fill="none" stroke="#38bdf8" strokeWidth="1" />
-                <ellipse cx="276" cy="23" rx="6" ry="2" fill="none" stroke="#38bdf8" strokeWidth="1" />
-              </g>
-
-              {/* 3. Sparse Aerial Points & Tie Points */}
-              <g fill="#0284c7">
-                <circle cx="180" cy="85" r="2.5" opacity="0.8" style={{ animation: 'pulsePoint 3s infinite 0.2s' }} />
-                <circle cx="220" cy="105" r="2" opacity="0.7" style={{ animation: 'pulsePoint 3s infinite 0.6s' }} />
-                <circle cx="280" cy="95" r="2.5" opacity="0.9" style={{ animation: 'pulsePoint 3s infinite 0.4s' }} />
-                <circle cx="330" cy="80" r="2" opacity="0.7" style={{ animation: 'pulsePoint 3s infinite 0.8s' }} />
-                <circle cx="250" cy="115" r="2" opacity="0.8" style={{ animation: 'pulsePoint 3s infinite 0.1s' }} />
-              </g>
-
-              {/* 4. 3D Reconstructed Mesh & Surface Geometry */}
-              <polygon 
-                points="80,180 160,140 220,155 260,125 320,150 380,135 440,175 360,195 200,195" 
-                fill="url(#terrainSurface)" 
-                stroke="#0284c7" 
-                strokeWidth="1.2" 
-                strokeLinejoin="round"
-              />
-
-              {/* Mesh Facet Triangulation Lines */}
-              <g stroke="rgba(2, 132, 199, 0.35)" strokeWidth="0.75" fill="none">
-                <line x1="160" y1="140" x2="260" y2="125" />
-                <line x1="220" y1="155" x2="260" y2="125" />
-                <line x1="260" y1="125" x2="380" y2="135" />
-                <line x1="220" y1="155" x2="320" y2="150" />
-                <line x1="320" y1="150" x2="380" y2="135" />
-                <line x1="160" y1="140" x2="220" y2="155" />
-                <line x1="80" y1="180" x2="220" y2="155" />
-                <line x1="220" y1="155" x2="200" y2="195" />
-                <line x1="320" y1="150" x2="360" y2="195" />
-                <line x1="380" y1="135" x2="440" y2="175" />
-                <line x1="440" y1="175" x2="360" y2="195" />
-              </g>
-
-              {/* 5. 3D Point Cloud Vertices */}
-              <g fill="#0d9488">
-                <circle cx="160" cy="140" r="3" />
-                <circle cx="220" cy="155" r="3" />
-                <circle cx="260" cy="125" r="3.5" fill="#0284c7" />
-                <circle cx="320" cy="150" r="3" />
-                <circle cx="380" cy="135" r="3" />
-                <circle cx="80" cy="180" r="2.5" />
-                <circle cx="440" cy="175" r="2.5" />
-                <circle cx="200" cy="195" r="2.5" />
-                <circle cx="360" cy="195" r="2.5" />
-              </g>
-
-              {/* 6. Dynamic Laser Scan Sweep Line */}
-              <g style={{ animation: 'scanLaser 5s ease-in-out infinite' }}>
-                <line x1="60" y1="0" x2="460" y2="0" stroke="url(#laserGradient)" strokeWidth="2.5" />
-              </g>
-
-              {/* Engineering Annotations & Coordinates */}
-              <text x="60" y="192" fill="#0369a1" fontSize="8" fontFamily="var(--font-mono)" fontWeight="600">
-                [GRID 10m] EPSG:4326
-              </text>
-              <text x="460" y="192" fill="#0369a1" fontSize="8" fontFamily="var(--font-mono)" fontWeight="600" textAnchor="end">
-                STEREO BASELINE: 1.8m
-              </text>
-            </svg>
-          </div>
-
-          {/* Title */}
-          <h2 style={{
-            fontSize: '1.9rem',
-            fontWeight: 800,
-            color: '#0f172a',
-            letterSpacing: '-0.025em',
-            marginTop: '26px',
-            marginBottom: '0'
-          }}>
-            No Active Reconstruction Job
-          </h2>
-
-          {/* Supporting Text */}
-          <p style={{
-            fontSize: '0.96rem',
-            color: '#64748b',
-            marginTop: '10px',
-            marginBottom: '32px',
-            maxWidth: '520px',
-            marginLeft: 'auto',
-            marginRight: 'auto',
-            lineHeight: 1.6
-          }}>
-            Select or launch a 3D reconstruction mission from the flight data ingestion page.
-          </p>
-
-          {/* Functional Button */}
-          <button 
-            onClick={() => setActivePage('upload')} 
-            className="geo-btn-primary"
-            style={{
-              padding: '13px 32px',
-              fontSize: '0.94rem',
-              fontWeight: 700,
-              borderRadius: '12px',
-              background: 'linear-gradient(135deg, #0284c7 0%, #06b6d4 100%)',
-              boxShadow: '0 4px 18px rgba(2, 132, 199, 0.32)',
-              letterSpacing: '-0.01em',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '10px',
-              cursor: 'pointer'
-            }}
-          >
-            <Upload size={18} />
-            <span>Upload Video &amp; Launch Job</span>
-          </button>
-        </div>
-
-        {/* CSS Animations */}
-        <style>{`
-          @keyframes scanSweepBg {
-            0% { top: 0%; opacity: 0; }
-            50% { opacity: 0.7; }
-            100% { top: 100%; opacity: 0; }
-          }
-          @keyframes pathDash {
-            to { stroke-dashoffset: -40; }
-          }
-          @keyframes droneHover {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-4px); }
-          }
-          @keyframes scanLaser {
-            0% { transform: translateY(35px); opacity: 0; }
-            30% { opacity: 0.85; }
-            80% { opacity: 0.85; }
-            100% { transform: translateY(185px); opacity: 0; }
-          }
-          @keyframes pulsePoint {
-            0%, 100% { transform: scale(1); opacity: 0.6; }
-            50% { transform: scale(1.35); opacity: 1; }
-          }
-        `}</style>
-      </div>
-    );
-  }
-
-  const isRunning = job.status === 'running' || job.status === 'resumed';
-  const isFinished = job.status === 'completed';
-
-  // Find real-time metrics from stages
-  const metrics = job.real_time_metrics || {};
-  const stages = job.stages || [];
-  const completedStagesCount = stages.filter(s => s.status === 'completed').length;
-  const totalStagesCount = stages.length || 13;
-
-  // Real-time Stage Sequence matching user specifications
-  const stageChecklist = [
-    {
-      id: "video_upload",
-      title: "Video uploaded",
-      detail: "Drone video & flight telemetry ingested",
-      isCompleted: true
-    },
-    {
-      id: "preprocessing",
-      title: metrics.frames_extracted ? `${metrics.frames_extracted.toLocaleString()} frames extracted` : "Frame sampling",
-      detail: "Adaptive frame extraction & color normalization",
-      stageName: "preprocessing"
-    },
-    {
-      id: "frame_quality",
-      title: "Quality filter",
-      detail: "Sharpness, luminance & motion blur filtering",
-      stageName: "frame_quality"
-    },
-    {
-      id: "dynamic_masking",
-      title: metrics.dynamic_objects_masked !== null ? `Dynamic objects masked (${metrics.dynamic_objects_masked} detected)` : "Dynamic masking",
-      detail: "YOLOv8-seg dynamic object occlusion filtering",
-      stageName: "dynamic_masking"
-    },
-    {
-      id: "keyframe_selection",
-      title: metrics.keyframes_selected ? `${metrics.keyframes_selected} keyframes selected` : "Keyframe selection",
-      detail: "Stationary frame pruning & baseline verification",
-      stageName: "keyframe_selection"
-    },
-    {
-      id: "pose_estimation",
-      title: "Fast pose estimation",
-      detail: "SIFT/ORB feature tracking & epipolar RANSAC",
-      stageName: "pose_estimation"
-    },
-    {
-      id: "geometry",
-      title: metrics.cameras_registered ? `Camera trajectory estimated (${metrics.cameras_registered} cameras)` : "Coarse 3D geometry",
-      detail: "Sparse Structure-from-Motion (Level 1 Rapid Model)",
-      stageName: "geometry",
-      hasRapidModel: true
-    },
-    {
-      id: "dense_point_cloud",
-      title: metrics.dense_points ? `Dense reconstruction (${metrics.dense_points.toLocaleString()} pts)` : "Dense reconstruction",
-      detail: "Semi-Global Block Matching (SGBM) stereo disparity fields",
-      stageName: "dense_point_cloud"
-    },
-    {
-      id: "mesh_generation",
-      title: metrics.triangles ? `Mesh surface generated (${metrics.triangles.toLocaleString()} tris)` : "Mesh generation",
-      detail: "3D Delaunay spatial surface triangulation",
-      stageName: "mesh_generation"
-    },
-    {
-      id: "texture_mapping",
-      title: "Texture mapping",
-      detail: "Projective UV texture synthesis & seam reduction",
-      stageName: "texture_mapping"
-    },
-    {
-      id: "georeferencing",
-      title: "Georeferencing",
-      detail: "Sim(3) Helmert transformation to WGS84 & UTM coordinates",
-      stageName: "georeferencing"
-    },
-    {
-      id: "confidence_estimation",
-      title: metrics.confidence_high_pct !== null ? `Confidence map (${metrics.confidence_high_pct}% high)` : "Confidence estimation",
-      detail: "Phase 12 evidence-based 8-stream confidence classification",
-      stageName: "confidence_estimation"
-    },
-    {
-      id: "validation",
-      title: "Final validation & certification",
-      detail: "GSD precision audit & photogrammetric quality certification",
-      stageName: "validation"
-    }
-  ];
-
-  const rapidModelAvailable = job.rapid_model_ready;
+  const isRunning = job?.status === 'running' || job?.status === 'resumed';
+  const isFinished = job?.status === 'completed';
+  const rapidModelAvailable = job?.rapid_model_ready || false;
+  const metrics = job?.real_time_metrics || {};
+  const stages = job?.stages || [];
 
   return (
-    <div className="geospatial-canvas" style={{ minHeight: 'calc(100vh - 120px)', position: 'relative', overflow: 'hidden', paddingBottom: '40px' }}>
-      <div style={{ maxWidth: '1360px', margin: '0 auto', padding: '32px 24px 0 24px', position: 'relative', zIndex: 2 }}>
-        {/* Header Banner */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <h1 style={{ fontSize: '1.8rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.025em', margin: 0 }}>
-                Processing Dashboard
-              </h1>
-              <StatusBadge status={job.status} />
-            </div>
-            <p className="font-mono" style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px' }}>
-              JOB ID: <span style={{ color: '#334155', fontWeight: 600 }}>{job.id}</span> • DEVICE: <span style={{ color: '#0284c7', fontWeight: 700 }}>{job.active_device?.toUpperCase()}</span>
-            </p>
+    <div style={STYLES.container}>
+      
+      {/* ══ HEADER: RECON-X MISSION CONSOLE ════════════════════════════════════ */}
+      <div style={STYLES.header}>
+        {/* Left: Brand & Title */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <span style={{
+              fontFamily: CONSOLE_MONO,
+              fontSize: '0.62rem',
+              fontWeight: 800,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              background: '#0f172a',
+              color: '#ffffff',
+              padding: '2px 6px',
+              borderRadius: '3px'
+            }}>
+              RECON-X
+            </span>
+            <span style={{
+              fontFamily: CONSOLE_MONO,
+              fontSize: '0.62rem',
+              fontWeight: 700,
+              letterSpacing: '0.1em',
+              color: '#0284c7'
+            }}>
+              SYSTEM CONSOLE // SPATIAL ENGINE
+            </span>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            {rapidModelAvailable && (
-              <button 
-                onClick={() => setActivePage('viewer')} 
-                className="btn-primary"
-                style={{ background: 'linear-gradient(135deg, #0284c7, #06b6d4)', boxShadow: '0 2px 10px rgba(2, 132, 199, 0.3)' }}
-              >
-                <Zap size={15} /> Open Level 1 Rapid Model
-              </button>
-            )}
-
-            {isFinished && (
-              <>
-                <button onClick={() => setActivePage('viewer')} className="btn-primary" style={{ background: 'linear-gradient(135deg, #059669, #10b981)', borderColor: '#059669' }}>
-                  <Sparkles size={15} /> Open Level 2 Refined Twin
-                </button>
-                <button onClick={() => setActivePage('analytics')} className="btn-secondary">
-                  <BarChart3 size={15} /> Quality Report
-                </button>
-              </>
-            )}
-
-            {(job.status === 'running' || job.status === 'pending') && (
-              <button 
-                onClick={handleCancelJob} 
-                className="btn-secondary"
-                style={{ color: '#e11d48', borderColor: 'rgba(225, 29, 72, 0.3)' }}
-              >
-                Cancel Job
-              </button>
-            )}
-
-            {(job.status === 'failed' || job.status === 'cancelled') && (
-              <button 
-                onClick={() => handleResumeStage(job.error_stage)} 
-                disabled={resuming}
-                className="btn-primary"
-              >
-                <RefreshCw size={15} /> {resuming ? 'Resuming...' : 'Resume Reconstruction'}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {error && (
-          <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', padding: '12px 16px', borderRadius: '10px', color: '#b91c1c', marginBottom: '20px', fontWeight: 500 }}>
-            {error}
-          </div>
-        )}
-
-        {/* Real-time Hardware & Execution Summary Card */}
-        <div style={{
-          backgroundColor: '#ffffff',
-          border: '1px solid #e2e8f0',
-          borderRadius: '14px',
-          padding: '24px',
-          marginBottom: '20px',
-          boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.02)'
-        }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
-            {/* 1. Elapsed Time */}
-            <div style={{ padding: '14px 18px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.74rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                <Clock size={14} color="#0284c7" /> Elapsed Time
-              </div>
-              <div className="font-mono" style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>
-                {formatTime(elapsedSec)}
-              </div>
-              <span style={{ fontSize: '0.72rem', color: isRunning ? '#0284c7' : '#64748b', fontWeight: isRunning ? 600 : 400 }}>
-                {isRunning ? '● Actively computing' : (isFinished ? 'Completed successfully' : 'Idle')}
-              </span>
-            </div>
-
-            {/* 2. Current Stage */}
-            <div style={{ padding: '14px 18px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.74rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                <Layers size={14} color="#0284c7" /> Current Stage
-              </div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', marginTop: '4px', textTransform: 'capitalize', letterSpacing: '-0.01em' }}>
-                {job.current_stage?.replace(/_/g, ' ') || 'Standby'}
-              </div>
-              <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                Stage {stages.find(s => s.stage_name === job.current_stage)?.stage_order || '-' } of {totalStagesCount}
-              </span>
-            </div>
-
-            {/* 3. GPU / CPU Status */}
-            <div style={{ padding: '14px 18px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.74rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                <Cpu size={14} color="#059669" /> GPU / CPU Status
-              </div>
-              <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>
-                {systemStatus ? (
-                  systemStatus.gpu_available ? (
-                    <span style={{ color: '#059669' }}>CUDA ({systemStatus.vram_used_gb} / {systemStatus.vram_total_gb} GB)</span>
-                  ) : (
-                    <span>Host CPU ({systemStatus.cpu_percent}%)</span>
-                  )
-                ) : (
-                  job.active_device?.toUpperCase()
-                )}
-              </div>
-              <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                RAM: {systemStatus ? `${systemStatus.ram_used_gb} / ${systemStatus.ram_total_gb} GB (${systemStatus.ram_percent}%)` : 'Monitoring'}
-              </span>
-            </div>
-
-            {/* 4. Measured Stage Progress (Non-Fake) */}
-            <div style={{ padding: '14px 18px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.74rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  <Activity size={14} color="#d97706" /> Measured Progress
-                </div>
-                <span className="font-mono" style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0284c7' }}>
-                  {job.progress_percent || 0}%
-                </span>
-              </div>
-              <div style={{ width: '100%', height: '7px', background: '#e2e8f0', borderRadius: '4px', marginTop: '8px', overflow: 'hidden' }}>
-                <div style={{
-                  width: `${job.progress_percent || 0}%`,
-                  height: '100%',
-                  background: job.status === 'failed' ? 'var(--danger)' : 'linear-gradient(90deg, #0284c7, #0ea5e9)',
-                  transition: 'width 0.4s ease'
-                }} />
-              </div>
-              <span style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '5px', display: 'block' }}>
-                {completedStagesCount} of {totalStagesCount} stages verified • Strictly verifiable progress
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Phase 13: Dual-Tier Progressive Model Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
-          {/* Level 1: Rapid Model */}
-          <div style={{
-            backgroundColor: '#ffffff',
-            border: rapidModelAvailable ? '1.5px solid #0284c7' : '1px solid #e2e8f0',
-            borderRadius: '12px',
-            padding: '20px',
-            position: 'relative',
-            boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.05)'
+          <h1 style={{
+            fontSize: '1.45rem',
+            fontWeight: 800,
+            letterSpacing: '-0.02em',
+            margin: 0,
+            color: '#0f172a',
+            lineHeight: 1.15
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Zap size={16} color="#0284c7" />
-                <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', letterSpacing: '0.02em', margin: 0 }}>LEVEL 1 — RAPID MODEL</h3>
-              </div>
-              {rapidModelAvailable ? (
-                <span style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#059669', fontSize: '0.7rem', fontWeight: 700, padding: '3px 9px', borderRadius: '6px' }}>
-                  READY
-                </span>
-              ) : (
-                <span style={{ background: '#f1f5f9', color: '#64748b', fontSize: '0.7rem', padding: '3px 9px', borderRadius: '6px', fontWeight: 600 }}>
-                  GENERATING AT STAGE 6...
-                </span>
-              )}
-            </div>
-            <p style={{ fontSize: '0.82rem', color: '#475569', marginBottom: '14px', lineHeight: 1.5, margin: '8px 0 14px 0' }}>
-              Coarse 3D geometry from keyframes &amp; Structure-from-Motion. Optimized for instant situational awareness.
-            </p>
-            {rapidModelAvailable ? (
-              <button 
-                onClick={() => setActivePage('viewer')}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  width: '100%',
-                  padding: '9px 14px',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  color: '#0284c7',
-                  backgroundColor: '#ffffff',
-                  border: '1.5px solid #0284c7',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <Box size={14} /> Preview Rapid Model in 3D Viewer
-              </button>
-            ) : (
-              <div style={{ fontSize: '0.76rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                Unlocked as soon as camera trajectory &amp; sparse 3D geometry are triangulated.
-              </div>
-            )}
-          </div>
-
-          {/* Level 2: Refined Model */}
-          <div style={{
-            backgroundColor: '#ffffff',
-            border: isFinished ? '1.5px solid #059669' : '1px solid #e2e8f0',
-            borderRadius: '12px',
-            padding: '20px',
-            boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.05)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Sparkles size={16} color="#059669" />
-                <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', letterSpacing: '0.02em', margin: 0 }}>LEVEL 2 — REFINED MODEL</h3>
-              </div>
-              {isFinished ? (
-                <span style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#059669', fontSize: '0.7rem', fontWeight: 700, padding: '3px 9px', borderRadius: '6px' }}>
-                  COMPLETED
-                </span>
-              ) : (
-                <span style={{ background: 'rgba(2, 132, 199, 0.1)', color: '#0284c7', fontSize: '0.7rem', padding: '3px 9px', borderRadius: '6px', fontWeight: 600 }}>
-                  GENERATING IN BACKGROUND...
-                </span>
-              )}
-            </div>
-            <p style={{ fontSize: '0.82rem', color: '#475569', marginBottom: '14px', lineHeight: 1.5, margin: '8px 0 14px 0' }}>
-              High-density MVS stereo point cloud, watertight surface mesh, PBR textures &amp; 8-stream confidence map.
-            </p>
-            {isFinished ? (
-              <button 
-                onClick={() => setActivePage('viewer')}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  width: '100%',
-                  padding: '9px 14px',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  color: '#ffffff',
-                  background: 'linear-gradient(135deg, #059669, #10b981)',
-                  border: '1px solid #059669',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 6px rgba(5, 150, 105, 0.25)'
-                }}
-              >
-                <Box size={14} /> Open High-Fidelity 3D Digital Twin
-              </button>
-            ) : (
-              <div style={{ fontSize: '0.76rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                Refining dense depth maps, texture atlas, and confidence fields.
-              </div>
-            )}
-          </div>
+            MISSION CONSOLE
+          </h1>
         </div>
 
-        {/* Main Grid: Real-Time Stage Checklist (Left) & Pipeline Interactive View (Right) */}
-        <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: '20px' }}>
-          {/* Real-Time Stage Checklist matching user requirements */}
+        {/* Right: Telemetry & Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+          {/* Hardware device pill */}
           <div style={{
-            backgroundColor: '#ffffff',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            background: '#f8fafc',
             border: '1px solid #e2e8f0',
-            borderRadius: '14px',
-            padding: '24px',
-            boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.05)'
+            padding: '5px 12px',
+            borderRadius: '6px'
           }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', marginBottom: '4px', letterSpacing: '-0.02em', margin: 0 }}>
-              Real-Time Pipeline Status
-            </h3>
-            <p style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '3px', marginBottom: '18px' }}>
-              Live execution status reflecting actual processing
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {stageChecklist.map((item, idx) => {
-                const stageRecord = stages.find(s => s.stage_name === item.stageName);
-                const isComp = item.isCompleted || (stageRecord && stageRecord.status === 'completed');
-                const isCurr = stageRecord && (job.current_stage === item.stageName && isRunning);
-                const isPend = !isComp && !isCurr;
-
-                return (
-                  <div 
-                    key={item.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '12px',
-                      padding: '10px 14px',
-                      borderRadius: '8px',
-                      background: isCurr ? 'rgba(2, 132, 199, 0.08)' : (isComp ? 'rgba(16, 185, 129, 0.06)' : '#f8fafc'),
-                      border: isCurr ? '1.5px solid #0284c7' : (isComp ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid #e2e8f0'),
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    <div style={{ marginTop: '2px' }}>
-                      {isComp && (
-                        <span style={{ color: '#059669', fontWeight: 800, fontSize: '0.95rem' }}>✓</span>
-                      )}
-                      {isCurr && (
-                        <span className="animate-pulse" style={{ color: '#0284c7', fontWeight: 800, fontSize: '0.95rem' }}>●</span>
-                      )}
-                      {isPend && (
-                        <span style={{ color: '#94a3b8', fontSize: '0.95rem' }}>○</span>
-                      )}
-                    </div>
-
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{
-                          fontSize: '0.84rem',
-                          fontWeight: isComp || isCurr ? 700 : 500,
-                          color: isComp || isCurr ? '#0f172a' : '#64748b'
-                        }}>
-                          {item.title}
-                        </span>
-                        {stageRecord?.execution_time_seconds > 0 && (
-                          <span className="font-mono" style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>
-                            {stageRecord.execution_time_seconds}s
-                          </span>
-                        )}
-                      </div>
-                      <p style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px', margin: 0 }}>
-                        {item.detail}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <Cpu size={14} color="#0284c7" />
+            <span style={{ fontFamily: CONSOLE_MONO, fontSize: '0.72rem', fontWeight: 700, color: '#334155' }}>
+              {systemStatus ? (
+                systemStatus.gpu_available ? `CUDA: ${systemStatus.vram_used_gb}/${systemStatus.vram_total_gb}GB` : `CPU: ${systemStatus.cpu_percent}%`
+              ) : (
+                job?.active_device?.toUpperCase() || 'NODE: READY'
+              )}
+            </span>
           </div>
 
-          {/* 13 Stage Detailed Interactive Drawer */}
-          <div>
-            <StagePipelineView
-              stages={stages}
-              currentStage={job.current_stage}
-              onResumeStage={handleResumeStage}
-              isRunning={isRunning || resuming}
-            />
+          {/* Elapsed runtime */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            padding: '5px 12px',
+            borderRadius: '6px'
+          }}>
+            <Clock size={14} color={isRunning ? '#0284c7' : '#64748b'} />
+            <span style={{ fontFamily: CONSOLE_MONO, fontSize: '0.74rem', fontWeight: 800, color: '#0f172a' }}>
+              {formatTime(elapsedSec)}
+            </span>
           </div>
+
+          {/* Measured Progress pill */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            padding: '5px 12px',
+            borderRadius: '6px'
+          }}>
+            <span style={{ fontFamily: CONSOLE_MONO, fontSize: '0.62rem', fontWeight: 700, color: '#64748b' }}>PROGRESS</span>
+            <span style={{ fontFamily: CONSOLE_MONO, fontSize: '0.78rem', fontWeight: 800, color: '#0284c7' }}>
+              {job?.progress_percent || 0}%
+            </span>
+          </div>
+
+          {/* Job status badge */}
+          {job ? (
+            <StatusBadge status={job.status} />
+          ) : (
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              padding: '4px 10px',
+              borderRadius: '999px',
+              background: 'rgba(148,163,184,0.1)',
+              border: '1px solid rgba(148,163,184,0.2)',
+              color: '#64748b',
+              fontSize: '0.72rem',
+              fontWeight: 700,
+              fontFamily: CONSOLE_MONO
+            }}>
+              <Circle size={8} /> STANDBY
+            </span>
+          )}
+
+          {/* Refresh button */}
+          <button 
+            onClick={fetchJobStatus} 
+            title="Refresh Console Telemetry"
+            style={{
+              padding: '7px 11px',
+              borderRadius: '6px',
+              background: '#ffffff',
+              border: '1px solid #e2e8f0',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              color: '#64748b'
+            }}
+          >
+            <RefreshCw size={14} />
+          </button>
         </div>
       </div>
+
+      {/* ══ ERROR ALERT ════════════════════════════════════════════════════════ */}
+      {error && (
+        <div style={{
+          background: '#fff1f2',
+          border: '1px solid #fecdd3',
+          borderRadius: '8px',
+          padding: '12px 18px',
+          color: '#be123c',
+          marginBottom: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          fontFamily: CONSOLE_MONO,
+          fontSize: '0.78rem',
+          fontWeight: 600
+        }}>
+          <AlertCircle size={16} color="#e11d48" style={{ flexShrink: 0 }} />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* ══ CONSOLE WORKSPACE: 2-COLUMN TECHNICAL LAYOUT ═══════════════════════ */}
+      <div style={{ display: 'grid', gridTemplateColumns: '400px 1fr', gap: '20px' }}>
+
+        {/* ── LEFT COLUMN: MISSION & INPUT ─────────────────────────────────── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+          {/* ── SECTION 01: MISSION ────────────────────────────────────────── */}
+          <div style={STYLES.sectionCard}>
+            <div style={STYLES.sectionHeader}>
+              <div style={STYLES.sectionTitle}>
+                <Plane size={13} color="#0284c7" />
+                <span>MISSION</span>
+              </div>
+              {selectedMission && (
+                <span style={{ fontFamily: CONSOLE_MONO, fontSize: '0.62rem', color: '#64748b', fontWeight: 600 }}>
+                  ID: {selectedMission.id?.slice(0, 8)}…
+                </span>
+              )}
+            </div>
+
+            <div style={STYLES.sectionBody}>
+              {/* Mission Selector */}
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', ...STYLES.cellLabel, marginBottom: '5px' }}>
+                  Active Mission Profile
+                </label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <select
+                    value={selectedMission?.id || ''}
+                    onChange={(e) => {
+                      const m = missions.find(x => x.id === e.target.value);
+                      setSelectedMission(m);
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '7px 10px',
+                      borderRadius: '6px',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      color: '#0f172a',
+                      fontFamily: CONSOLE_MONO,
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {missions.length === 0 && <option value="">No missions available</option>}
+                    {missions.map(m => (
+                      <option key={m.id} value={m.id}>
+                        {m.name} ({m.drone_model || 'UAV'})
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => setActivePage('create-mission')}
+                    title="Create New Mission"
+                    style={{
+                      padding: '7px 12px',
+                      borderRadius: '6px',
+                      background: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      color: '#0284c7',
+                      fontFamily: CONSOLE_MONO,
+                      fontSize: '0.7rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    + NEW
+                  </button>
+                </div>
+              </div>
+
+              {/* Mission Technical Grid */}
+              <div style={STYLES.dataGrid}>
+                <div style={STYLES.dataCell}>
+                  <div style={STYLES.cellLabel}>DRONE PLATFORM</div>
+                  <div style={STYLES.cellValue}>{selectedMission?.drone_model || 'Standard UAV'}</div>
+                </div>
+                <div style={STYLES.dataCell}>
+                  <div style={STYLES.cellLabel}>CAMERA PAYLOAD</div>
+                  <div style={STYLES.cellValue}>{selectedMission?.camera_model || 'RGB Optical'}</div>
+                </div>
+                <div style={STYLES.dataCell}>
+                  <div style={STYLES.cellLabel}>FOCAL LENGTH</div>
+                  <div style={STYLES.cellValue}>{selectedMission?.focal_length_mm ? `${selectedMission.focal_length_mm} mm` : '35 mm'}</div>
+                </div>
+                <div style={STYLES.dataCell}>
+                  <div style={STYLES.cellLabel}>ALTITUDE</div>
+                  <div style={STYLES.cellValue}>{selectedMission?.flight_altitude_m ? `${selectedMission.flight_altitude_m} m AGL` : '60 m'}</div>
+                </div>
+                <div style={STYLES.dataCell}>
+                  <div style={STYLES.cellLabel}>TARGET GSD</div>
+                  <div style={STYLES.cellValue}>{selectedMission?.target_gsd_cm ? `${selectedMission.target_gsd_cm} cm/px` : '1.5 cm/px'}</div>
+                </div>
+                <div style={STYLES.dataCell}>
+                  <div style={STYLES.cellLabel}>OVERLAP (FWD/SIDE)</div>
+                  <div style={STYLES.cellValue}>
+                    {selectedMission ? `${selectedMission.overlap_forward_percent || 80}% / ${selectedMission.overlap_side_percent || 70}%` : '80% / 70%'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── SECTION 02: INPUT ──────────────────────────────────────────── */}
+          <div style={STYLES.sectionCard}>
+            <div style={STYLES.sectionHeader}>
+              <div style={STYLES.sectionTitle}>
+                <Video size={13} color="#0284c7" />
+                <span>INPUT</span>
+              </div>
+              <span style={{ fontFamily: CONSOLE_MONO, fontSize: '0.62rem', color: selectedMission?.video_filename ? '#059669' : '#d97706', fontWeight: 700 }}>
+                {selectedMission?.video_filename ? '● FOOTAGE LOADED' : '○ NO FOOTAGE'}
+              </span>
+            </div>
+
+            <div style={STYLES.sectionBody}>
+              {/* Technical Input Footage Specifications */}
+              <div style={STYLES.dataGrid}>
+                <div style={{ ...STYLES.dataCell, gridColumn: 'span 2' }}>
+                  <div style={STYLES.cellLabel}>SOURCE FILE</div>
+                  <div style={{ ...STYLES.cellValue, fontSize: '0.74rem', wordBreak: 'break-all' }}>
+                    {selectedMission?.video_filename || 'No video uploaded yet'}
+                  </div>
+                </div>
+                <div style={STYLES.dataCell}>
+                  <div style={STYLES.cellLabel}>RESOLUTION</div>
+                  <div style={STYLES.cellValue}>
+                    {selectedMission?.video_width && selectedMission?.video_height 
+                      ? `${selectedMission.video_width}×${selectedMission.video_height}` 
+                      : (selectedMission?.video_filename ? '4K UHD (3840×2160)' : '—')}
+                  </div>
+                </div>
+                <div style={STYLES.dataCell}>
+                  <div style={STYLES.cellLabel}>FRAME RATE</div>
+                  <div style={STYLES.cellValue}>
+                    {selectedMission?.video_fps ? `${selectedMission.video_fps.toFixed(2)} fps` : '29.97 fps'}
+                  </div>
+                </div>
+                <div style={STYLES.dataCell}>
+                  <div style={STYLES.cellLabel}>DURATION</div>
+                  <div style={STYLES.cellValue}>
+                    {selectedMission?.video_duration_seconds ? `${selectedMission.video_duration_seconds.toFixed(1)}s` : '—'}
+                  </div>
+                </div>
+                <div style={STYLES.dataCell}>
+                  <div style={STYLES.cellLabel}>CODEC</div>
+                  <div style={STYLES.cellValue}>
+                    {selectedMission?.video_codec?.toUpperCase() || 'H.264 / AVC'}
+                  </div>
+                </div>
+                <div style={STYLES.dataCell}>
+                  <div style={STYLES.cellLabel}>FILE SIZE</div>
+                  <div style={STYLES.cellValue}>
+                    {selectedMission?.video_size_bytes 
+                      ? `${(selectedMission.video_size_bytes / (1024*1024)).toFixed(1)} MB` 
+                      : '—'}
+                  </div>
+                </div>
+                <div style={STYLES.dataCell}>
+                  <div style={STYLES.cellLabel}>KEYFRAMES EXTRACTED</div>
+                  <div style={{ ...STYLES.cellValue, color: selectedMission?.extracted_frame_count ? '#059669' : '#0f172a' }}>
+                    {selectedMission?.extracted_frame_count 
+                      ? `${selectedMission.extracted_frame_count} frames` 
+                      : 'Not extracted'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Video upload / replacement button */}
+              <div style={{ marginTop: '14px', display: 'flex', gap: '8px' }}>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="video/*,.mp4,.mov,.mkv,.avi"
+                  style={{ display: 'none' }}
+                  onChange={handleVideoUpload}
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    background: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    color: '#334155',
+                    fontFamily: CONSOLE_MONO,
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    cursor: uploading ? 'wait' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Upload size={13} color="#0284c7" />
+                  <span>{uploading ? `UPLOADING (${uploadProgress}%)` : (selectedMission?.video_filename ? 'REPLACE FOOTAGE' : 'SELECT & UPLOAD FOOTAGE')}</span>
+                </button>
+
+                {/* Extract frames trigger if video exists */}
+                {selectedMission?.video_filename && !selectedMission?.extracted_frame_count && (
+                  <button
+                    onClick={handleExtractFrames}
+                    disabled={extracting}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      background: '#0284c7',
+                      border: '1px solid #0284c7',
+                      color: '#ffffff',
+                      fontFamily: CONSOLE_MONO,
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      cursor: extracting ? 'wait' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <Layers size={13} />
+                    <span>{extracting ? 'EXTRACTING...' : 'EXTRACT FRAMES'}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        {/* ── RIGHT COLUMN: PROCESSING & OUTPUT ────────────────────────────── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+          {/* ── SECTION 03: PROCESSING ──────────────────────────────────────── */}
+          <div style={STYLES.sectionCard}>
+            <div style={STYLES.sectionHeader}>
+              <div style={STYLES.sectionTitle}>
+                <Activity size={13} color="#0284c7" />
+                <span>PROCESSING</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontFamily: CONSOLE_MONO, fontSize: '0.62rem', color: '#64748b', fontWeight: 600 }}>
+                  CURRENT STAGE: <strong style={{ color: '#0f172a' }}>{job?.current_stage?.toUpperCase() || 'STANDBY'}</strong>
+                </span>
+
+                {/* Launch / Cancel / Resume Actions */}
+                {!job ? (
+                  <button
+                    onClick={handleLaunchJob}
+                    disabled={launching || !selectedMission?.id}
+                    style={{
+                      padding: '5px 12px',
+                      borderRadius: '5px',
+                      background: '#0284c7',
+                      border: '1px solid #0284c7',
+                      color: '#ffffff',
+                      fontFamily: CONSOLE_MONO,
+                      fontSize: '0.68rem',
+                      fontWeight: 700,
+                      cursor: launching ? 'wait' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <Play size={11} />
+                    <span>{launching ? 'INITIALIZING...' : 'START RECONSTRUCTION'}</span>
+                  </button>
+                ) : isRunning ? (
+                  <button
+                    onClick={handleCancelJob}
+                    style={{
+                      padding: '5px 10px',
+                      borderRadius: '5px',
+                      background: '#ffffff',
+                      border: '1px solid #fecdd3',
+                      color: '#e11d48',
+                      fontFamily: CONSOLE_MONO,
+                      fontSize: '0.66rem',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    CANCEL JOB
+                  </button>
+                ) : (job.status === 'failed' || job.status === 'cancelled') ? (
+                  <button
+                    onClick={() => handleResumeStage(job.error_stage)}
+                    disabled={resuming}
+                    style={{
+                      padding: '5px 12px',
+                      borderRadius: '5px',
+                      background: '#0284c7',
+                      border: '1px solid #0284c7',
+                      color: '#ffffff',
+                      fontFamily: CONSOLE_MONO,
+                      fontSize: '0.68rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
+                  >
+                    <RotateCw size={11} />
+                    <span>{resuming ? 'RESUMING...' : 'RESUME RECONSTRUCTION'}</span>
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            <div style={STYLES.sectionBody}>
+              {/* Telemetry Strip: Hardware, Timer & Progress */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                gap: '10px',
+                marginBottom: '20px'
+              }}>
+                <div style={STYLES.dataCell}>
+                  <div style={STYLES.cellLabel}>COMPUTE DEVICE</div>
+                  <div style={{ ...STYLES.cellValue, color: '#0284c7' }}>
+                    {job?.active_device?.toUpperCase() || (systemStatus?.gpu_available ? 'CUDA GPU' : 'CPU')}
+                  </div>
+                </div>
+                <div style={STYLES.dataCell}>
+                  <div style={STYLES.cellLabel}>ELAPSED RUNTIME</div>
+                  <div style={STYLES.cellValue}>{formatTime(elapsedSec)}</div>
+                </div>
+                <div style={STYLES.dataCell}>
+                  <div style={STYLES.cellLabel}>MEASURED PROGRESS</div>
+                  <div style={{ ...STYLES.cellValue, color: '#059669' }}>{job?.progress_percent || 0}%</div>
+                </div>
+                <div style={STYLES.dataCell}>
+                  <div style={STYLES.cellLabel}>STAGE ORDER</div>
+                  <div style={STYLES.cellValue}>
+                    {stages.find(s => s.stage_name === job?.current_stage)?.stage_order || (isFinished ? '13' : '—')} / 13
+                  </div>
+                </div>
+              </div>
+
+              {/* Measured Progress Bar */}
+              <div style={{ marginBottom: '22px' }}>
+                <div style={{
+                  height: '6px',
+                  background: '#e2e8f0',
+                  borderRadius: '3px',
+                  overflow: 'hidden'
+                }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${job?.progress_percent || 0}%`,
+                    background: job?.status === 'failed' ? '#e11d48' : 'linear-gradient(90deg, #0284c7, #0d9488)',
+                    borderRadius: '3px',
+                    transition: 'width 0.4s ease'
+                  }} />
+                </div>
+              </div>
+
+              {/* ── PREMIUM VERTICAL PIPELINE (THE 9 REQUESTED STAGES) ──────── */}
+              <div style={{
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                padding: '16px 20px',
+                boxShadow: '0 1px 2px rgba(15, 23, 42, 0.02)'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '14px',
+                  paddingBottom: '8px',
+                  borderBottom: '1px solid #f1f5f9'
+                }}>
+                  <span style={{
+                    fontFamily: CONSOLE_MONO,
+                    fontSize: '0.65rem',
+                    fontWeight: 800,
+                    letterSpacing: '0.12em',
+                    textTransform: 'uppercase',
+                    color: '#64748b'
+                  }}>
+                    RECONSTRUCTION PIPELINE EXECUTION
+                  </span>
+                  <button
+                    onClick={() => setShowStageDetails(!showStageDetails)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#0284c7',
+                      fontFamily: CONSOLE_MONO,
+                      fontSize: '0.62rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <span>{showStageDetails ? 'COLLAPSE DETAILED VIEW' : 'EXPAND 13-STAGE ARCHITECTURE'}</span>
+                    <ChevronDown size={12} style={{ transform: showStageDetails ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                  </button>
+                </div>
+
+                {/* Vertical Stage Stack */}
+                <div style={{ display: 'flex', flexDirection: 'column', position: 'relative' }}>
+                  {VERTICAL_STAGES.map((step, idx) => {
+                    const status = step.resolveStatus(job, selectedMission, stages);
+                    const metric = step.getMetric ? step.getMetric(metrics) : null;
+                    const stageRecord = stages.find(s => s.stage_name === step.id || s.stage_name === step.backendStage);
+                    const execTime = stageRecord?.execution_time_seconds;
+                    const isLast = idx === VERTICAL_STAGES.length - 1;
+
+                    return (
+                      <div key={step.id} style={{ display: 'flex', alignItems: 'flex-start', position: 'relative', minHeight: '44px' }}>
+                        
+                        {/* Connecting Line */}
+                        {!isLast && (
+                          <div style={{
+                            position: 'absolute',
+                            top: '22px',
+                            left: '11px',
+                            bottom: '-4px',
+                            width: '2px',
+                            background: status === 'completed' ? '#a7f3d0' : (status === 'running' ? '#bae6fd' : '#e2e8f0'),
+                            zIndex: 1
+                          }} />
+                        )}
+
+                        {/* Indicator glyph (✓, ●, ○, ✕) */}
+                        <div style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                          marginRight: '14px',
+                          marginTop: '2px',
+                          position: 'relative',
+                          zIndex: 2,
+                          background: status === 'completed' ? '#ecfdf5' : (status === 'running' ? '#f0f9ff' : (status === 'failed' ? '#fff1f2' : '#ffffff')),
+                          border: status === 'completed' ? '1.5px solid #059669' : (status === 'running' ? '1.5px solid #0284c7' : (status === 'failed' ? '1.5px solid #e11d48' : '1px solid #cbd5e1')),
+                          boxShadow: status === 'running' ? '0 0 0 3px rgba(2, 132, 199, 0.15)' : 'none'
+                        }}>
+                          {status === 'completed' && (
+                            <span style={{ color: '#059669', fontWeight: 900, fontSize: '0.8rem', lineHeight: 1 }}>✓</span>
+                          )}
+                          {status === 'running' && (
+                            <span className="animate-pulse" style={{ color: '#0284c7', fontWeight: 900, fontSize: '0.8rem', lineHeight: 1 }}>●</span>
+                          )}
+                          {status === 'failed' && (
+                            <span style={{ color: '#e11d48', fontWeight: 900, fontSize: '0.75rem', lineHeight: 1 }}>✕</span>
+                          )}
+                          {status === 'pending' && (
+                            <span style={{ color: '#94a3b8', fontSize: '0.75rem', lineHeight: 1 }}>○</span>
+                          )}
+                        </div>
+
+                        {/* Stage Label & Details */}
+                        <div style={{
+                          flex: 1,
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          paddingBottom: '14px',
+                          borderBottom: isLast ? 'none' : '1px solid #f8fafc'
+                        }}>
+                          <div>
+                            <div style={{
+                              fontFamily: CONSOLE_MONO,
+                              fontSize: '0.75rem',
+                              fontWeight: status === 'running' || status === 'completed' ? 800 : 600,
+                              letterSpacing: '0.06em',
+                              color: status === 'running' ? '#0284c7' : (status === 'completed' ? '#0f172a' : '#64748b'),
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px'
+                            }}>
+                              <span>{step.label}</span>
+                              {metric && (
+                                <span style={{
+                                  fontSize: '0.62rem',
+                                  fontWeight: 700,
+                                  color: '#059669',
+                                  background: '#ecfdf5',
+                                  padding: '1px 5px',
+                                  borderRadius: '3px'
+                                }}>
+                                  {metric}
+                                </span>
+                              )}
+                            </div>
+                            <div style={{
+                              fontFamily: CONSOLE_MONO,
+                              fontSize: '0.62rem',
+                              color: '#94a3b8',
+                              marginTop: '2px'
+                            }}>
+                              {step.desc}
+                            </div>
+                          </div>
+
+                          {/* Time & State Badge */}
+                          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                            {execTime > 0 && (
+                              <div style={{ fontFamily: CONSOLE_MONO, fontSize: '0.65rem', color: '#64748b', fontWeight: 600 }}>
+                                {execTime.toFixed(1)}s
+                              </div>
+                            )}
+                            <span style={{
+                              fontFamily: CONSOLE_MONO,
+                              fontSize: '0.58rem',
+                              fontWeight: 700,
+                              letterSpacing: '0.06em',
+                              color: status === 'completed' ? '#059669' : (status === 'running' ? '#0284c7' : (status === 'failed' ? '#e11d48' : '#94a3b8'))
+                            }}>
+                              {status.toUpperCase()}
+                            </span>
+                          </div>
+                        </div>
+
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Detailed 13-Stage Drawer (Collapsible) */}
+              {showStageDetails && (
+                <div style={{ marginTop: '16px' }}>
+                  <StagePipelineView
+                    stages={stages}
+                    currentStage={job?.current_stage}
+                    onResumeStage={handleResumeStage}
+                    isRunning={isRunning || resuming}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── SECTION 04: OUTPUT ─────────────────────────────────────────── */}
+          <div style={STYLES.sectionCard}>
+            <div style={STYLES.sectionHeader}>
+              <div style={STYLES.sectionTitle}>
+                <Box size={13} color="#0284c7" />
+                <span>OUTPUT</span>
+              </div>
+              <span style={{ fontFamily: CONSOLE_MONO, fontSize: '0.62rem', color: isFinished ? '#059669' : '#64748b', fontWeight: 700 }}>
+                {isFinished ? '✓ DUAL-TIER MODELS CERTIFIED' : (rapidModelAvailable ? '● LEVEL 1 READY' : '○ STANDBY')}
+              </span>
+            </div>
+
+            <div style={STYLES.sectionBody}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+                
+                {/* Level 1: Rapid Model Output */}
+                <div style={{
+                  background: rapidModelAvailable ? '#f0fdf4' : '#f8fafc',
+                  border: rapidModelAvailable ? '1px solid #86efac' : '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  padding: '14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between'
+                }}>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Zap size={14} color="#0284c7" />
+                        <span style={{ fontFamily: CONSOLE_MONO, fontSize: '0.74rem', fontWeight: 800, color: '#0f172a' }}>
+                          LEVEL 1 — RAPID MODEL
+                        </span>
+                      </div>
+                      <span style={{
+                        fontFamily: CONSOLE_MONO,
+                        fontSize: '0.58rem',
+                        fontWeight: 700,
+                        color: rapidModelAvailable ? '#059669' : '#64748b',
+                        background: rapidModelAvailable ? '#dcfce7' : '#e2e8f0',
+                        padding: '1px 5px',
+                        borderRadius: '3px'
+                      }}>
+                        {rapidModelAvailable ? 'READY' : 'GENERATING...'}
+                      </span>
+                    </div>
+                    <p style={{ fontFamily: CONSOLE_MONO, fontSize: '0.64rem', color: '#64748b', lineHeight: 1.4, margin: '4px 0 12px 0' }}>
+                      Coarse 3D sparse point cloud &amp; reconstructed camera trajectory. Immediate spatial awareness.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => setActivePage('viewer')}
+                    disabled={!rapidModelAvailable}
+                    style={{
+                      width: '100%',
+                      padding: '7px 10px',
+                      borderRadius: '5px',
+                      background: rapidModelAvailable ? '#ffffff' : '#f1f5f9',
+                      border: rapidModelAvailable ? '1px solid #0284c7' : '1px solid #cbd5e1',
+                      color: rapidModelAvailable ? '#0284c7' : '#94a3b8',
+                      fontFamily: CONSOLE_MONO,
+                      fontSize: '0.68rem',
+                      fontWeight: 700,
+                      cursor: rapidModelAvailable ? 'pointer' : 'not-allowed',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <Box size={12} />
+                    <span>INSPECT RAPID MODEL IN 3D</span>
+                  </button>
+                </div>
+
+                {/* Level 2: Refined Digital Twin Output */}
+                <div style={{
+                  background: isFinished ? '#ecfdf5' : '#f8fafc',
+                  border: isFinished ? '1px solid #6ee7b7' : '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  padding: '14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between'
+                }}>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Sparkles size={14} color="#059669" />
+                        <span style={{ fontFamily: CONSOLE_MONO, fontSize: '0.74rem', fontWeight: 800, color: '#0f172a' }}>
+                          LEVEL 2 — REFINED TWIN
+                        </span>
+                      </div>
+                      <span style={{
+                        fontFamily: CONSOLE_MONO,
+                        fontSize: '0.58rem',
+                        fontWeight: 700,
+                        color: isFinished ? '#059669' : '#64748b',
+                        background: isFinished ? '#d1fae5' : '#e2e8f0',
+                        padding: '1px 5px',
+                        borderRadius: '3px'
+                      }}>
+                        {isFinished ? 'CERTIFIED' : 'PENDING'}
+                      </span>
+                    </div>
+                    <p style={{ fontFamily: CONSOLE_MONO, fontSize: '0.64rem', color: '#64748b', lineHeight: 1.4, margin: '4px 0 12px 0' }}>
+                      High-density dense point cloud, textured watertight mesh (OBJ/GLB) with 8-stream confidence classification.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => setActivePage('viewer')}
+                    disabled={!isFinished}
+                    style={{
+                      width: '100%',
+                      padding: '7px 10px',
+                      borderRadius: '5px',
+                      background: isFinished ? '#059669' : '#f1f5f9',
+                      border: isFinished ? '1px solid #059669' : '1px solid #cbd5e1',
+                      color: isFinished ? '#ffffff' : '#94a3b8',
+                      fontFamily: CONSOLE_MONO,
+                      fontSize: '0.68rem',
+                      fontWeight: 700,
+                      cursor: isFinished ? 'pointer' : 'not-allowed',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <Box size={12} />
+                    <span>LAUNCH HIGH-FIDELITY 3D TWIN</span>
+                  </button>
+                </div>
+
+              </div>
+
+              {/* Quality Report & Export links */}
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  onClick={() => setActivePage('analytics')}
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    color: '#334155',
+                    fontFamily: CONSOLE_MONO,
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <BarChart3 size={13} color="#0284c7" />
+                  <span>QUALITY &amp; ACCURACY ANALYTICS</span>
+                </button>
+
+                {job?.id && isFinished && (
+                  <a
+                    href={apiClient.getExportBundleUrl(job.id)}
+                    download
+                    style={{
+                      padding: '8px 14px',
+                      borderRadius: '6px',
+                      background: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      color: '#059669',
+                      fontFamily: CONSOLE_MONO,
+                      fontSize: '0.7rem',
+                      fontWeight: 700,
+                      textDecoration: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <Download size={13} />
+                    <span>EXPORT BUNDLE (ZIP)</span>
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
     </div>
   );
 }

@@ -3,49 +3,74 @@
  */
 const API_BASE = '/api/v1';
 
+/**
+ * Safe JSON parser — gives a clear error when backend is down or returns empty body.
+ */
+async function safeJson(res) {
+  const text = await res.text();
+  if (!text || text.trim() === '') {
+    throw new Error('Backend server is not responding. Please start the backend on port 8000.');
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Server returned invalid response (status ${res.status}). Is the backend running?`);
+  }
+}
+
+async function safeFetch(url, options) {
+  let res;
+  try {
+    res = await fetch(url, options);
+  } catch (networkErr) {
+    throw new Error('Cannot connect to backend server. Please run: python backend/run.py');
+  }
+  return res;
+}
+
 export const apiClient = {
   // ── System ────────────────────────────────────────────────────────────────
   async getSystemHardware() {
-    const res = await fetch(`${API_BASE}/system/hardware`);
+    const res = await safeFetch(`${API_BASE}/system/hardware`);
     if (!res.ok) throw new Error('Failed to fetch hardware status');
-    return res.json();
+    return safeJson(res);
   },
 
   async getSystemStatus() {
-    const res = await fetch(`${API_BASE}/system/status`);
+    const res = await safeFetch(`${API_BASE}/system/status`);
     if (!res.ok) throw new Error('Failed to fetch system status');
-    return res.json();
+    return safeJson(res);
   },
 
   async getHealth() {
-    const res = await fetch(`${API_BASE}/system/health`);
-    return res.json();
+    const res = await safeFetch(`${API_BASE}/system/health`);
+    return safeJson(res);
   },
 
   // ── Missions ──────────────────────────────────────────────────────────────
   async listMissions() {
-    const res = await fetch(`${API_BASE}/missions`);
+    const res = await safeFetch(`${API_BASE}/missions`);
     if (!res.ok) throw new Error('Failed to fetch missions');
-    return res.json();
+    return safeJson(res);
   },
 
   async getMission(missionId) {
-    const res = await fetch(`${API_BASE}/missions/${missionId}`);
+    const res = await safeFetch(`${API_BASE}/missions/${missionId}`);
     if (!res.ok) throw new Error(`Failed to fetch mission ${missionId}`);
-    return res.json();
+    return safeJson(res);
   },
 
   async createMission(data) {
-    const res = await fetch(`${API_BASE}/missions`, {
+    const res = await safeFetch(`${API_BASE}/missions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
     if (!res.ok) {
-      const err = await res.json();
+      const err = await safeJson(res);
       throw new Error(err.detail || 'Failed to create mission');
     }
-    return res.json();
+    return safeJson(res);
   },
 
   // ── Phase 1: Video Ingestion ──────────────────────────────────────────────
@@ -105,15 +130,15 @@ export const apiClient = {
   async uploadTelemetry(missionId, file) {
     const formData = new FormData();
     formData.append('file', file);
-    const res = await fetch(`${API_BASE}/missions/${missionId}/telemetry`, {
+    const res = await safeFetch(`${API_BASE}/missions/${missionId}/telemetry`, {
       method: 'POST',
       body: formData,
     });
     if (!res.ok) {
-      const err = await res.json();
+      const err = await safeJson(res);
       throw new Error(err.detail || 'Telemetry upload failed');
     }
-    return res.json();
+    return safeJson(res);
   },
 
   /**
@@ -121,7 +146,7 @@ export const apiClient = {
    * Returns 202 immediately — poll getMissionStatus() for live progress.
    */
   async extractFrames(missionId, { intervalSec = 0.5, maxDimension = 1920, jpegQuality = 90 } = {}) {
-    const res = await fetch(`${API_BASE}/missions/${missionId}/extract-frames`, {
+    const res = await safeFetch(`${API_BASE}/missions/${missionId}/extract-frames`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -131,10 +156,10 @@ export const apiClient = {
       }),
     });
     if (!res.ok) {
-      const err = await res.json();
+      const err = await safeJson(res);
       throw new Error(err.detail || 'Failed to start frame extraction');
     }
-    return res.json();
+    return safeJson(res);
   },
 
   /**
@@ -143,51 +168,51 @@ export const apiClient = {
    */
   async getMissionStatus(missionId, includeFrames = false) {
     const url = `${API_BASE}/missions/${missionId}/status${includeFrames ? '?include_frames=true' : ''}`;
-    const res = await fetch(url);
+    const res = await safeFetch(url);
     if (!res.ok) throw new Error(`Failed to fetch ingestion status for mission ${missionId}`);
-    return res.json();
+    return safeJson(res);
   },
 
   /** Paginated list of extracted IngestionFrame records for a mission. */
   async getMissionFrames(missionId, skip = 0, limit = 100) {
-    const res = await fetch(`${API_BASE}/missions/${missionId}/frames?skip=${skip}&limit=${limit}`);
+    const res = await safeFetch(`${API_BASE}/missions/${missionId}/frames?skip=${skip}&limit=${limit}`);
     if (!res.ok) throw new Error('Failed to fetch mission frames');
-    return res.json();
+    return safeJson(res);
   },
 
   // ── Jobs ──────────────────────────────────────────────────────────────────
   async createJob(missionId, preferredDevice = 'auto') {
-    const res = await fetch(`${API_BASE}/jobs`, {
+    const res = await safeFetch(`${API_BASE}/jobs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mission_id: missionId, preferred_device: preferredDevice })
     });
     if (!res.ok) {
-      const err = await res.json();
+      const err = await safeJson(res);
       throw new Error(err.detail || 'Failed to dispatch job');
     }
-    return res.json();
+    return safeJson(res);
   },
 
   async getJob(jobId) {
-    const res = await fetch(`${API_BASE}/jobs/${jobId}`);
+    const res = await safeFetch(`${API_BASE}/jobs/${jobId}`);
     if (!res.ok) throw new Error(`Failed to fetch job ${jobId}`);
-    return res.json();
+    return safeJson(res);
   },
 
   async resumeJob(jobId, fromStage = null) {
     const url = fromStage
       ? `${API_BASE}/jobs/${jobId}/resume?from_stage=${encodeURIComponent(fromStage)}`
       : `${API_BASE}/jobs/${jobId}/resume`;
-    const res = await fetch(url, { method: 'POST' });
+    const res = await safeFetch(url, { method: 'POST' });
     if (!res.ok) throw new Error('Failed to resume job');
-    return res.json();
+    return safeJson(res);
   },
 
   async cancelJob(jobId) {
-    const res = await fetch(`${API_BASE}/jobs/${jobId}/cancel`, { method: 'POST' });
+    const res = await safeFetch(`${API_BASE}/jobs/${jobId}/cancel`, { method: 'POST' });
     if (!res.ok) throw new Error('Failed to cancel job');
-    return res.json();
+    return safeJson(res);
   },
 
   getExportBundleUrl(jobId) {
@@ -195,76 +220,76 @@ export const apiClient = {
   },
 
   async getMissionJobs(missionId) {
-    const res = await fetch(`${API_BASE}/jobs/mission/${missionId}`);
+    const res = await safeFetch(`${API_BASE}/jobs/mission/${missionId}`);
     if (!res.ok) throw new Error('Failed to fetch jobs');
-    return res.json();
+    return safeJson(res);
   },
 
   // ── Results ───────────────────────────────────────────────────────────────
   async getQualityReport(jobId) {
-    const res = await fetch(`${API_BASE}/results/${jobId}/quality-report`);
+    const res = await safeFetch(`${API_BASE}/results/${jobId}/quality-report`);
     if (!res.ok) throw new Error('Failed to fetch quality report');
-    return res.json();
+    return safeJson(res);
   },
 
   async getFrameQualityReport(jobId) {
-    const res = await fetch(`${API_BASE}/results/${jobId}/frame-quality`);
+    const res = await safeFetch(`${API_BASE}/results/${jobId}/frame-quality`);
     if (!res.ok) throw new Error('Failed to fetch frame quality report');
-    return res.json();
+    return safeJson(res);
   },
 
   async getKeyframesReport(jobId) {
-    const res = await fetch(`${API_BASE}/results/${jobId}/keyframes`);
+    const res = await safeFetch(`${API_BASE}/results/${jobId}/keyframes`);
     if (!res.ok) throw new Error('Failed to fetch keyframes report');
-    return res.json();
+    return safeJson(res);
   },
 
   async getDynamicObjectsReport(jobId) {
-    const res = await fetch(`${API_BASE}/results/${jobId}/dynamic-objects`);
+    const res = await safeFetch(`${API_BASE}/results/${jobId}/dynamic-objects`);
     if (!res.ok) throw new Error('Failed to fetch dynamic objects report');
-    return res.json();
+    return safeJson(res);
   },
 
   async getDynamicAnalyticsReport(jobId) {
-    const res = await fetch(`${API_BASE}/results/${jobId}/dynamic-analytics`);
+    const res = await safeFetch(`${API_BASE}/results/${jobId}/dynamic-analytics`);
     if (!res.ok) throw new Error('Failed to fetch dynamic analytics report');
-    return res.json();
+    return safeJson(res);
   },
 
   async getIlluminationReport(jobId) {
-    const res = await fetch(`${API_BASE}/results/${jobId}/illumination`);
+    const res = await safeFetch(`${API_BASE}/results/${jobId}/illumination`);
     if (!res.ok) throw new Error('Failed to fetch illumination report');
-    return res.json();
+    return safeJson(res);
   },
 
   async getTrajectoryReport(jobId) {
-    const res = await fetch(`${API_BASE}/results/${jobId}/trajectory`);
+    const res = await safeFetch(`${API_BASE}/results/${jobId}/trajectory`);
     if (!res.ok) throw new Error('Failed to fetch trajectory report');
-    return res.json();
+    return safeJson(res);
   },
 
   async getReconstructionReport(jobId) {
-    const res = await fetch(`${API_BASE}/results/${jobId}/reconstruction`);
+    const res = await safeFetch(`${API_BASE}/results/${jobId}/reconstruction`);
     if (!res.ok) throw new Error('Failed to fetch reconstruction report');
-    return res.json();
+    return safeJson(res);
   },
 
   async getDenseReport(jobId) {
-    const res = await fetch(`${API_BASE}/results/${jobId}/dense`);
+    const res = await safeFetch(`${API_BASE}/results/${jobId}/dense`);
     if (!res.ok) throw new Error('Failed to fetch dense report');
-    return res.json();
+    return safeJson(res);
   },
 
   async getBenchmarkReport(jobId) {
-    const res = await fetch(`${API_BASE}/results/${jobId}/benchmark`);
+    const res = await safeFetch(`${API_BASE}/results/${jobId}/benchmark`);
     if (!res.ok) throw new Error('Failed to fetch benchmark report');
-    return res.json();
+    return safeJson(res);
   },
 
   async getArtifacts(jobId) {
-    const res = await fetch(`${API_BASE}/results/${jobId}/artifacts`);
+    const res = await safeFetch(`${API_BASE}/results/${jobId}/artifacts`);
     if (!res.ok) throw new Error('Failed to fetch artifacts');
-    return res.json();
+    return safeJson(res);
   },
 
   async getJobArtifacts(jobId) {
@@ -277,7 +302,7 @@ export const apiClient = {
 
   // ── Stages ────────────────────────────────────────────────────────────────
   async listStages() {
-    const res = await fetch(`${API_BASE}/stages`);
-    return res.json();
+    const res = await safeFetch(`${API_BASE}/stages`);
+    return safeJson(res);
   },
 };

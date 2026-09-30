@@ -89,13 +89,18 @@ class PoseEstimationStage(BaseStage):
         ransac_thresh = float(params.get("ransac_threshold_px", 3.0))
         use_normalized = bool(params.get("use_normalized", True))
 
-        # ── 2. Feature Detector Setup ────────────────────────────────────
+        matcher_type = params.get("matcher_type", "FLANN").upper()
+        # ── 2. Feature Detector & Matcher Setup ──────────────────────────
         if detector_type == "ORB":
             detector = cv2.ORB_create(nfeatures=n_features)
             matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
         else:
             detector = cv2.SIFT_create(nfeatures=n_features)
-            matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
+            if matcher_type == "FLANN":
+                # FLANN KD-Tree index for fast high-dimensional float matching
+                matcher = cv2.FlannBasedMatcher(dict(algorithm=1, trees=5), dict(checks=50))
+            else:
+                matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
 
         # ── 3. Load Phase 4 Static Masks & Phase 5 Normalized Images ─────
         # Phase 4 Static Masks
